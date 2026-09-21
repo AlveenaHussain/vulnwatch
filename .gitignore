@@ -1,0 +1,30 @@
+# ==========================================
+# VulnWatch .gitignore
+# Files that must NEVER be committed to Git
+# ==========================================
+
+# ---------- Secrets & credentials ----------
+# Real passwords/keys live here. Never commit.
+.env
+.env.*
+# Exception: the example file (no real secrets) SHOULD be committed
+!.env.example
+*.pem
+*.key
+
+# ---------- Python ----------
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ---------- Lab data (scan outputs, logs, evidence) ----------
+# Raw lab output stays local; curated samples go in docs/
+data/
+*.log
+
+# ---------- Editors & OS junk ----------
+.vscode/
+Thumbs.db
+desktop.ini
+.DS_Store
