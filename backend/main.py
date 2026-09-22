@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from database import check_database, get_connection
+from scan_import import router as scan_import_router
 
 logger = logging.getLogger("vulnwatch")
 
@@ -12,6 +13,8 @@ app = FastAPI(
     description="Vulnerability Assessment and Security Monitoring platform",
     version="0.1.0",
 )
+
+app.include_router(scan_import_router)
 
 
 @app.get("/health")
