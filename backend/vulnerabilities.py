@@ -1,18 +1,20 @@
 """
 Vulnerability ingestion endpoint for VulnWatch.
 
-An NVD collector sends vulnerability findings as JSON. This endpoint:
-- validates the request with Pydantic,
-- derives severity from CVSS score,
-- upserts vulnerabilities,
+This module:
+- imports vulnerability findings,
+- derives severity from CVSS,
+- calculates risk score from CVSS,
 - maps vulnerabilities to discovered services,
-- saves everything in ONE database transaction.
+- creates security findings,
+- updates finding status and remediation.
 """
 
 import logging
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 
 from database import get_connection
 from schemas import (
@@ -23,7 +25,10 @@ from security import require_api_key
 
 logger = logging.getLogger("vulnwatch")
 
-router = APIRouter(prefix="/api/v1", tags=["vulnerabilities"])
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["vulnerabilities"],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +55,20 @@ def derive_severity(score: float | None) -> str:
         return "CRITICAL"
 
     return "UNKNOWN"
+
+
+# ---------------------------------------------------------------------------
+# Risk calculation
+# ---------------------------------------------------------------------------
+def calculate_risk_score(cvss_score: float | None) -> float | None:
+    """Calculate normalized risk score from CVSS."""
+    if cvss_score is None:
+        return None
+
+    return round(
+        max(0.0, min(float(cvss_score), 10.0)),
+        2,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -158,9 +177,6 @@ def import_vulnerabilities(
 
                 for finding in payload.findings:
 
-                    # -------------------------------------------------------
-                    # Find the discovered service
-                    # -------------------------------------------------------
                     cur.execute(
                         FIND_SERVICE,
                         {
@@ -178,9 +194,6 @@ def import_vulnerabilities(
 
                     service_id = service_row[0]
 
-                    # -------------------------------------------------------
-                    # Process vulnerabilities for this service
-                    # -------------------------------------------------------
                     for vulnerability in finding.vulnerabilities:
 
                         severity = derive_severity(
@@ -211,9 +224,6 @@ def import_vulnerabilities(
                         else:
                             counts["vulnerabilities_updated"] += 1
 
-                        # ---------------------------------------------------
-                        # Create/update service-vulnerability relationship
-                        # ---------------------------------------------------
                         cur.execute(
                             UPSERT_MAPPING,
                             {
@@ -250,7 +260,7 @@ def import_vulnerabilities(
 
 
 # ---------------------------------------------------------------------------
-# Vulnerability list with optional severity filter
+# Vulnerability list
 # ---------------------------------------------------------------------------
 @router.get(
     "/vulnerabilities",
@@ -259,7 +269,10 @@ def import_vulnerabilities(
 def get_vulnerabilities(
     severity: str | None = Query(
         default=None,
-        description="Filter by severity: CRITICAL, HIGH, MEDIUM, LOW, NONE, UNKNOWN",
+        description=(
+            "Filter by severity: "
+            "CRITICAL, HIGH, MEDIUM, LOW, NONE, UNKNOWN"
+        ),
     ),
 ):
     severity_filter = ""
@@ -319,7 +332,9 @@ def get_vulnerabilities(
                 "cve_id": row[1],
                 "description": row[2],
                 "cvss_version": row[3],
-                "cvss_score": float(row[4]) if row[4] is not None else None,
+                "cvss_score": (
+                    float(row[4]) if row[4] is not None else None
+                ),
                 "cvss_vector": row[5],
                 "severity": row[6],
                 "cwe": row[7],
@@ -400,7 +415,9 @@ def get_service_vulnerabilities():
                 "cve_id": row[9],
                 "description": row[10],
                 "cvss_version": row[11],
-                "cvss_score": float(row[12]) if row[12] is not None else None,
+                "cvss_score": (
+                    float(row[12]) if row[12] is not None else None
+                ),
                 "severity": row[13],
                 "cwe": row[14],
                 "matched_cpe": row[15],
@@ -412,11 +429,15 @@ def get_service_vulnerabilities():
         ]
 
     except (psycopg.Error, RuntimeError):
-        logger.exception("Failed to fetch service vulnerability mappings")
+        logger.exception(
+            "Failed to fetch service vulnerability mappings"
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+
 # ---------------------------------------------------------------------------
 # Asset vulnerabilities
 # ---------------------------------------------------------------------------
@@ -482,7 +503,9 @@ def get_asset_vulnerabilities(asset_id: int):
                 "cve_id": row[10],
                 "description": row[11],
                 "cvss_version": row[12],
-                "cvss_score": float(row[13]) if row[13] is not None else None,
+                "cvss_score": (
+                    float(row[13]) if row[13] is not None else None
+                ),
                 "severity": row[14],
                 "cwe": row[15],
                 "matched_cpe": row[16],
@@ -502,6 +525,8 @@ def get_asset_vulnerabilities(asset_id: int):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+
 # ---------------------------------------------------------------------------
 # Vulnerability summary
 # ---------------------------------------------------------------------------
@@ -540,6 +565,492 @@ def get_vulnerability_summary():
 
     except (psycopg.Error, RuntimeError):
         logger.exception("Failed to fetch vulnerability summary")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Findings - Create
+# ---------------------------------------------------------------------------
+class FindingCreateRequest(BaseModel):
+    service_vulnerability_id: int
+    title: str
+    description: str | None = None
+    remediation: str | None = None
+
+
+@router.post(
+    "/findings",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a security finding",
+)
+def create_finding(payload: FindingCreateRequest):
+
+    lookup_query = """
+        SELECT
+            sv.id,
+            v.severity,
+            v.cvss_score
+        FROM service_vulnerabilities sv
+        JOIN vulnerabilities v
+            ON v.id = sv.vulnerability_id
+        WHERE sv.id = %s;
+    """
+
+    insert_query = """
+        INSERT INTO findings (
+            service_vulnerability_id,
+            severity,
+            risk_score,
+            status,
+            title,
+            description,
+            remediation
+        )
+        VALUES (
+            %s,
+            %s,
+            %s,
+            'OPEN',
+            %s,
+            %s,
+            %s
+        )
+        RETURNING
+            id,
+            service_vulnerability_id,
+            severity,
+            risk_score,
+            status,
+            title,
+            description,
+            remediation,
+            first_seen,
+            last_seen,
+            resolved_at;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    lookup_query,
+                    (payload.service_vulnerability_id,),
+                )
+
+                vulnerability_row = cur.fetchone()
+
+                if vulnerability_row is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Service vulnerability not found",
+                    )
+
+                service_vulnerability_id = vulnerability_row[0]
+                severity = vulnerability_row[1]
+                cvss_score = vulnerability_row[2]
+
+                risk_score = calculate_risk_score(cvss_score)
+
+                cur.execute(
+                    insert_query,
+                    (
+                        service_vulnerability_id,
+                        severity,
+                        risk_score,
+                        payload.title,
+                        payload.description,
+                        payload.remediation,
+                    ),
+                )
+
+                row = cur.fetchone()
+
+        return {
+            "id": row[0],
+            "service_vulnerability_id": row[1],
+            "severity": row[2],
+            "risk_score": (
+                float(row[3]) if row[3] is not None else None
+            ),
+            "status": row[4],
+            "title": row[5],
+            "description": row[6],
+            "remediation": row[7],
+            "first_seen": row[8],
+            "last_seen": row[9],
+            "resolved_at": row[10],
+        }
+
+    except HTTPException:
+        raise
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception("Failed to create finding")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Findings - List
+# ---------------------------------------------------------------------------
+@router.get(
+    "/findings",
+    summary="List security findings",
+)
+def get_findings(
+    status_filter: str | None = Query(
+        default=None,
+        alias="status",
+        description="Filter by status: OPEN, IN_PROGRESS, RESOLVED",
+    ),
+    severity: str | None = Query(
+        default=None,
+        description=(
+            "Filter by severity: "
+            "CRITICAL, HIGH, MEDIUM, LOW, NONE, UNKNOWN"
+        ),
+    ),
+):
+
+    filters = []
+    params = []
+
+    if status_filter:
+        normalized_status = status_filter.upper()
+
+        allowed_statuses = {
+            "OPEN",
+            "IN_PROGRESS",
+            "RESOLVED",
+        }
+
+        if normalized_status not in allowed_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Invalid status. Use one of: "
+                    "OPEN, IN_PROGRESS, RESOLVED"
+                ),
+            )
+
+        filters.append("f.status = %s")
+        params.append(normalized_status)
+
+    if severity:
+        normalized_severity = severity.upper()
+
+        allowed_severities = {
+            "CRITICAL",
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+            "NONE",
+            "UNKNOWN",
+        }
+
+        if normalized_severity not in allowed_severities:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Invalid severity. Use one of: "
+                    "CRITICAL, HIGH, MEDIUM, LOW, NONE, UNKNOWN"
+                ),
+            )
+
+        filters.append("f.severity = %s")
+        params.append(normalized_severity)
+
+    where_clause = ""
+
+    if filters:
+        where_clause = "WHERE " + " AND ".join(filters)
+
+    query = f"""
+        SELECT
+            f.id,
+            f.service_vulnerability_id,
+            a.ip_address::text AS target_ip,
+            s.port,
+            s.protocol,
+            s.service_name,
+            s.product,
+            s.version,
+            v.cve_id,
+            f.severity,
+            f.risk_score,
+            f.status,
+            f.title,
+            f.description,
+            f.remediation,
+            f.first_seen,
+            f.last_seen,
+            f.resolved_at
+        FROM findings f
+        JOIN service_vulnerabilities sv
+            ON sv.id = f.service_vulnerability_id
+        JOIN services s
+            ON s.id = sv.service_id
+        JOIN assets a
+            ON a.id = s.asset_id
+        JOIN vulnerabilities v
+            ON v.id = sv.vulnerability_id
+        {where_clause}
+        ORDER BY
+            f.risk_score DESC NULLS LAST,
+            f.severity,
+            f.id;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+        return [
+            {
+                "id": row[0],
+                "service_vulnerability_id": row[1],
+                "target_ip": row[2],
+                "port": row[3],
+                "protocol": row[4],
+                "service_name": row[5],
+                "product": row[6],
+                "version": row[7],
+                "cve_id": row[8],
+                "severity": row[9],
+                "risk_score": (
+                    float(row[10]) if row[10] is not None else None
+                ),
+                "status": row[11],
+                "title": row[12],
+                "description": row[13],
+                "remediation": row[14],
+                "first_seen": row[15],
+                "last_seen": row[16],
+                "resolved_at": row[17],
+            }
+            for row in rows
+        ]
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception("Failed to fetch findings")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Findings - Update status and remediation
+# ---------------------------------------------------------------------------
+class FindingUpdateRequest(BaseModel):
+    status: str | None = None
+    remediation: str | None = None
+
+
+@router.patch(
+    "/findings/{finding_id}",
+    summary="Update finding status or remediation",
+)
+def update_finding(
+    finding_id: int,
+    payload: FindingUpdateRequest,
+):
+    allowed_statuses = {
+        "OPEN",
+        "IN_PROGRESS",
+        "RESOLVED",
+    }
+
+    normalized_status = None
+
+    if payload.status is not None:
+        normalized_status = payload.status.upper()
+
+        if normalized_status not in allowed_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Invalid status. Use one of: "
+                    "OPEN, IN_PROGRESS, RESOLVED"
+                ),
+            )
+
+    if normalized_status is None and payload.remediation is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Provide at least one field: "
+                "status or remediation"
+            ),
+        )
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # Check that finding exists
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM findings
+                    WHERE id = %s
+                    """,
+                    (finding_id,),
+                )
+
+                finding = cur.fetchone()
+
+                if finding is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Finding not found",
+                    )
+
+                # -------------------------------------------------------
+                # Status + remediation
+                # -------------------------------------------------------
+                if (
+                    normalized_status is not None
+                    and payload.remediation is not None
+                ):
+                    cur.execute(
+                        """
+                        UPDATE findings
+                        SET
+                            status = %s,
+                            remediation = %s,
+                            last_seen = NOW(),
+                            resolved_at = CASE
+                                WHEN %s = 'RESOLVED'
+                                    THEN NOW()
+                                ELSE NULL
+                            END
+                        WHERE id = %s
+                        RETURNING
+                            id,
+                            service_vulnerability_id,
+                            severity,
+                            risk_score,
+                            status,
+                            title,
+                            description,
+                            remediation,
+                            first_seen,
+                            last_seen,
+                            resolved_at
+                        """,
+                        (
+                            normalized_status,
+                            payload.remediation,
+                            normalized_status,
+                            finding_id,
+                        ),
+                    )
+
+                # -------------------------------------------------------
+                # Status only
+                # -------------------------------------------------------
+                elif normalized_status is not None:
+                    cur.execute(
+                        """
+                        UPDATE findings
+                        SET
+                            status = %s,
+                            last_seen = NOW(),
+                            resolved_at = CASE
+                                WHEN %s = 'RESOLVED'
+                                    THEN NOW()
+                                ELSE NULL
+                            END
+                        WHERE id = %s
+                        RETURNING
+                            id,
+                            service_vulnerability_id,
+                            severity,
+                            risk_score,
+                            status,
+                            title,
+                            description,
+                            remediation,
+                            first_seen,
+                            last_seen,
+                            resolved_at
+                        """,
+                        (
+                            normalized_status,
+                            normalized_status,
+                            finding_id,
+                        ),
+                    )
+
+                # -------------------------------------------------------
+                # Remediation only
+                # -------------------------------------------------------
+                else:
+                    cur.execute(
+                        """
+                        UPDATE findings
+                        SET
+                            remediation = %s,
+                            last_seen = NOW()
+                        WHERE id = %s
+                        RETURNING
+                            id,
+                            service_vulnerability_id,
+                            severity,
+                            risk_score,
+                            status,
+                            title,
+                            description,
+                            remediation,
+                            first_seen,
+                            last_seen,
+                            resolved_at
+                        """,
+                        (
+                            payload.remediation,
+                            finding_id,
+                        ),
+                    )
+
+                updated = cur.fetchone()
+
+                conn.commit()
+
+        return {
+            "id": updated[0],
+            "service_vulnerability_id": updated[1],
+            "severity": updated[2],
+            "risk_score": (
+                float(updated[3])
+                if updated[3] is not None
+                else None
+            ),
+            "status": updated[4],
+            "title": updated[5],
+            "description": updated[6],
+            "remediation": updated[7],
+            "first_seen": updated[8],
+            "last_seen": updated[9],
+            "resolved_at": updated[10],
+        }
+
+    except HTTPException:
+        raise
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception(
+            "Failed to update finding: finding_id=%s",
+            finding_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
