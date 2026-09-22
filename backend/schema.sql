@@ -79,7 +79,7 @@ CREATE TABLE vulnerabilities (
     cvss_vector TEXT,
 
     severity TEXT NOT NULL
-        CHECK (severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NONE')),
+        CHECK (severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOWCHECK (severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NONE', 'UNKNOWN')), 'NONE')),
 
     cwe TEXT,
 

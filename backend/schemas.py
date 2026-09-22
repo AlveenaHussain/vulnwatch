@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AssetResponse(BaseModel):
@@ -21,6 +21,7 @@ class ServiceResponse(BaseModel):
 
     id: int
     asset_id: int
+    target_ip: str
     port: int
     protocol: str
     service_name: str | None = None
@@ -42,3 +43,35 @@ class ScanResponse(BaseModel):
     nmap_command: str
     scanner_ip: str | None = None
     created_at: datetime
+
+
+class VulnerabilityImportItem(BaseModel):
+    cve_id: str = Field(min_length=1, max_length=64)
+    description: str | None = None
+    cvss_version: str | None = None
+    cvss_score: float | None = Field(default=None, ge=0.0, le=10.0)
+    cvss_vector: str | None = None
+    cwe: str | None = None
+    published: datetime | None = None
+    last_modified: datetime | None = None
+
+
+class VulnerabilityFinding(BaseModel):
+    target_ip: str
+    port: int = Field(ge=1, le=65535)
+    protocol: str
+    matched_cpe: str
+    vulnerabilities: list[VulnerabilityImportItem]
+
+
+class VulnerabilityImportRequest(BaseModel):
+    source: str
+    findings: list[VulnerabilityFinding]
+
+
+class VulnerabilityImportResponse(BaseModel):
+    vulnerabilities_created: int
+    vulnerabilities_updated: int
+    mappings_created: int
+    mappings_updated: int
+    services_not_found: int

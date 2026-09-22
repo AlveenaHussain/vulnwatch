@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from database import check_database, get_connection
 from scan_import import router as scan_import_router
+from vulnerabilities import router as vulnerability_router
 
 logger = logging.getLogger("vulnwatch")
 
@@ -15,6 +16,7 @@ app = FastAPI(
 )
 
 app.include_router(scan_import_router)
+app.include_router(vulnerability_router)
 
 
 @app.get("/health")
@@ -69,25 +71,28 @@ def get_assets():
 
 @app.get("/api/v1/services")
 def get_services():
-    """Return discovered services from PostgreSQL."""
+    """Return discovered services with their target IP."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    id,
-                    asset_id,
-                    port,
-                    protocol,
-                    service_name,
-                    product,
-                    version,
-                    cpe,
-                    state,
-                    first_seen,
-                    last_seen,
-                    last_scan_id
-                FROM services
-                ORDER BY asset_id, port;
+                    s.id,
+                    s.asset_id,
+                    a.ip_address::text AS target_ip,
+                    s.port,
+                    s.protocol,
+                    s.service_name,
+                    s.product,
+                    s.version,
+                    s.cpe,
+                    s.state,
+                    s.first_seen,
+                    s.last_seen,
+                    s.last_scan_id
+                FROM services s
+                JOIN assets a
+                    ON a.id = s.asset_id
+                ORDER BY s.asset_id, s.port;
             """)
 
             columns = [desc.name for desc in cur.description]
