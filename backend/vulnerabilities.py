@@ -1168,3 +1168,176 @@ def get_dashboard_summary():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+# ---------------------------------------------------------------------------
+# Dashboard - Risk Overview
+# ---------------------------------------------------------------------------
+@router.get(
+    "/dashboard/risk-overview",
+    summary="Get dashboard risk overview",
+)
+def get_dashboard_risk_overview():
+    query = """
+        SELECT
+            COUNT(*) AS total_findings,
+
+            COUNT(*) FILTER (
+                WHERE status = 'OPEN'
+            ) AS open_findings,
+
+            COALESCE(
+                SUM(risk_score),
+                0
+            ) AS total_risk_score,
+
+            COALESCE(
+                SUM(risk_score) FILTER (
+                    WHERE status = 'OPEN'
+                ),
+                0
+            ) AS open_risk_score,
+
+            COALESCE(
+                AVG(risk_score) FILTER (
+                    WHERE status = 'OPEN'
+                ),
+                0
+            ) AS average_open_risk,
+
+            COALESCE(
+                MAX(risk_score) FILTER (
+                    WHERE status = 'OPEN'
+                ),
+                0
+            ) AS highest_open_risk
+
+        FROM findings;
+    """
+
+    highest_finding_query = """
+        SELECT
+            f.id,
+            f.title,
+            f.severity,
+            f.risk_score,
+            f.status,
+            a.ip_address::text AS target_ip,
+            s.port,
+            s.protocol,
+            v.cve_id
+        FROM findings f
+        JOIN service_vulnerabilities sv
+            ON sv.id = f.service_vulnerability_id
+        JOIN services s
+            ON s.id = sv.service_id
+        JOIN assets a
+            ON a.id = s.asset_id
+        JOIN vulnerabilities v
+            ON v.id = sv.vulnerability_id
+        WHERE f.status = 'OPEN'
+        ORDER BY
+            f.risk_score DESC NULLS LAST,
+            f.id
+        LIMIT 1;
+    """
+
+    asset_risk_query = """
+        SELECT
+            a.id,
+            a.ip_address::text AS target_ip,
+            a.hostname,
+            COUNT(f.id) AS open_findings,
+            COALESCE(
+                SUM(f.risk_score),
+                0
+            ) AS open_risk_score
+        FROM assets a
+        LEFT JOIN services s
+            ON s.asset_id = a.id
+        LEFT JOIN service_vulnerabilities sv
+            ON sv.service_id = s.id
+        LEFT JOIN findings f
+            ON f.service_vulnerability_id = sv.id
+            AND f.status = 'OPEN'
+        GROUP BY
+            a.id,
+            a.ip_address,
+            a.hostname
+        ORDER BY
+            open_risk_score DESC,
+            a.id;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # Overall risk
+                cur.execute(query)
+                risk_row = cur.fetchone()
+
+                # Highest-risk open finding
+                cur.execute(highest_finding_query)
+                highest_row = cur.fetchone()
+
+                # Asset-wise risk
+                cur.execute(asset_risk_query)
+                asset_rows = cur.fetchall()
+
+        highest_risk_finding = None
+
+        if highest_row is not None:
+            highest_risk_finding = {
+                "id": highest_row[0],
+                "title": highest_row[1],
+                "severity": highest_row[2],
+                "risk_score": (
+                    float(highest_row[3])
+                    if highest_row[3] is not None
+                    else None
+                ),
+                "status": highest_row[4],
+                "target_ip": highest_row[5],
+                "port": highest_row[6],
+                "protocol": highest_row[7],
+                "cve_id": highest_row[8],
+            }
+
+        asset_risk = [
+            {
+                "asset_id": row[0],
+                "target_ip": row[1],
+                "hostname": row[2],
+                "open_findings": row[3],
+                "open_risk_score": (
+                    float(row[4])
+                    if row[4] is not None
+                    else 0.0
+                ),
+            }
+            for row in asset_rows
+        ]
+
+        return {
+            "findings": {
+                "total": risk_row[0],
+                "open": risk_row[1],
+            },
+            "risk": {
+                "total": float(risk_row[2]),
+                "open": float(risk_row[3]),
+                "average_open": round(float(risk_row[4]), 2),
+                "highest_open": float(risk_row[5]),
+            },
+            "highest_risk_open_finding": highest_risk_finding,
+            "assets": asset_risk,
+        }
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception(
+            "Failed to fetch dashboard risk overview"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
