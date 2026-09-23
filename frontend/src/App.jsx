@@ -11,11 +11,15 @@ function App() {
   const [statusDistribution, setStatusDistribution] = useState([]);
 
   const [assets, setAssets] = useState([]);
+  const [services, setServices] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const [servicesLoading, setServicesLoading] = useState(false);
+
   const [error, setError] = useState("");
   const [assetsError, setAssetsError] = useState("");
+  const [servicesError, setServicesError] = useState("");
 
   const [activePage, setActivePage] = useState("Dashboard");
 
@@ -79,15 +83,6 @@ function App() {
 
         const data = await response.json();
 
-        /*
-         * Assets API may return:
-         * 1. Direct array: [...]
-         * 2. { assets: [...] }
-         * 3. { items: [...] }
-         *
-         * Normalize everything into an array so the UI
-         * can safely use map(), filter(), forEach(), etc.
-         */
         let normalizedAssets = [];
 
         if (Array.isArray(data)) {
@@ -111,6 +106,47 @@ function App() {
     }
 
     loadAssets();
+  }, []);
+
+  useEffect(() => {
+    async function loadServices() {
+      try {
+        setServicesLoading(true);
+        setServicesError("");
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/v1/services`
+        );
+
+        if (!response.ok) {
+          throw new Error("Services API request failed");
+        }
+
+        const data = await response.json();
+
+        let normalizedServices = [];
+
+        if (Array.isArray(data)) {
+          normalizedServices = data;
+        } else if (Array.isArray(data?.services)) {
+          normalizedServices = data.services;
+        } else if (Array.isArray(data?.items)) {
+          normalizedServices = data.items;
+        }
+
+        setServices(normalizedServices);
+      } catch (err) {
+        console.error(err);
+        setServices([]);
+        setServicesError(
+          "Unable to load services from VulnWatch backend."
+        );
+      } finally {
+        setServicesLoading(false);
+      }
+    }
+
+    loadServices();
   }, []);
 
   const severityClass = (severity) =>
@@ -445,15 +481,244 @@ function App() {
     );
   };
 
+  const renderServices = () => {
+    const criticalCount = services.filter(
+      (item) => item.severity === "CRITICAL"
+    ).length;
+
+    const vulnerableServiceCount = services.filter(
+      (item) => item.vulnerability_id
+    ).length;
+
+    return (
+      <main className="dashboard-content">
+        <section className="hero-section">
+          <div>
+            <div className="eyebrow">MONITORING</div>
+
+            <h1>Services</h1>
+
+            <p>
+              Review network services discovered across monitored
+              assets.
+            </p>
+          </div>
+
+          <div className="hero-decoration">
+            <div className="scan-ring ring-one"></div>
+            <div className="scan-ring ring-two"></div>
+            <div className="scan-core">⌘</div>
+          </div>
+        </section>
+
+        {servicesError && (
+          <div className="error-banner">
+            <strong>Connection Error</strong>
+            <span>{servicesError}</span>
+          </div>
+        )}
+
+        <section className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon blue">⌘</span>
+              <span className="stat-category">NETWORK</span>
+            </div>
+
+            <div className="stat-value">
+              {servicesLoading ? "—" : services.length}
+            </div>
+
+            <div className="stat-name">Total Services</div>
+
+            <div className="stat-line">
+              Services returned by VulnWatch
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon purple">◉</span>
+              <span className="stat-category">TARGETS</span>
+            </div>
+
+            <div className="stat-value">
+              {servicesLoading
+                ? "—"
+                : new Set(
+                    services
+                      .map((item) => item.target_ip)
+                      .filter(Boolean)
+                  ).size}
+            </div>
+
+            <div className="stat-name">Target Assets</div>
+
+            <div className="stat-line">
+              Assets associated with discovered services
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon orange">△</span>
+              <span className="stat-category">SECURITY</span>
+            </div>
+
+            <div className="stat-value">
+              {servicesLoading
+                ? "—"
+                : vulnerableServiceCount}
+            </div>
+
+            <div className="stat-name">Vulnerable Services</div>
+
+            <div className="stat-line">
+              Services mapped to vulnerabilities
+            </div>
+          </div>
+
+          <div className="stat-card critical-card">
+            <div className="stat-top">
+              <span className="stat-icon red">!</span>
+              <span className="stat-category">CRITICAL</span>
+            </div>
+
+            <div className="stat-value">
+              {servicesLoading ? "—" : criticalCount}
+            </div>
+
+            <div className="stat-name">Critical Services</div>
+
+            <div className="stat-line">
+              Services with critical severity
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-card findings-card">
+          <div className="card-heading">
+            <div>
+              <span className="card-label">
+                SERVICE INVENTORY
+              </span>
+
+              <h2>Discovered Network Services</h2>
+            </div>
+
+            <div className="finding-total">
+              {services.length} services
+            </div>
+          </div>
+
+          <div className="table-container">
+            {servicesLoading ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  opacity: 0.7,
+                }}
+              >
+                Loading services...
+              </div>
+            ) : services.length === 0 ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  opacity: 0.7,
+                }}
+              >
+                No services found.
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>TARGET</th>
+                    <th>PORT</th>
+                    <th>PROTOCOL</th>
+                    <th>SERVICE</th>
+                    <th>PRODUCT</th>
+                    <th>VERSION</th>
+                    <th>CVE</th>
+                    <th>SEVERITY</th>
+                    <th>CVSS</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {services.map((item, index) => (
+                    <tr
+                      key={`${item.id || item.service_id}-${index}`}
+                    >
+                      <td>
+                        <strong>
+                          {item.target_ip || "N/A"}
+                        </strong>
+                      </td>
+
+                      <td>
+                        {item.port ?? "N/A"}
+                      </td>
+
+                      <td>
+                        {item.protocol || "N/A"}
+                      </td>
+
+                      <td>
+                        <div className="finding-name">
+                          {item.service_name || "N/A"}
+                        </div>
+                      </td>
+
+                      <td>
+                        {item.product || "N/A"}
+                      </td>
+
+                      <td>
+                        {item.version || "N/A"}
+                      </td>
+
+                      <td>
+                        <span className="cve-code">
+                          {item.cve_id || "N/A"}
+                        </span>
+                      </td>
+
+                      <td>
+                        {item.severity ? (
+                          <span
+                            className={`severity-badge ${severityClass(
+                              item.severity
+                            )}`}
+                          >
+                            {item.severity}
+                          </span>
+                        ) : (
+                          "N/A"
+                        )}
+                      </td>
+
+                      <td>
+                        <strong className="risk-number-small">
+                          {item.cvss_score ?? "N/A"}
+                        </strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  };
+
   const renderPlaceholderPage = () => {
     const pageConfig = {
-      Services: {
-        icon: "⌘",
-        section: "MONITORING",
-        title: "Services",
-        description:
-          "Review network services discovered across monitored assets.",
-      },
       Vulnerabilities: {
         icon: "△",
         section: "SECURITY",
@@ -1032,6 +1297,8 @@ function App() {
           ? renderDashboard()
           : activePage === "Assets"
           ? renderAssets()
+          : activePage === "Services"
+          ? renderServices()
           : renderPlaceholderPage()}
       </div>
     </div>
