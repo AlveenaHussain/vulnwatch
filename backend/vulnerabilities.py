@@ -1055,3 +1055,116 @@ def update_finding(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+# ---------------------------------------------------------------------------
+# Dashboard - Security Summary
+# ---------------------------------------------------------------------------
+@router.get(
+    "/dashboard/summary",
+    summary="Get dashboard security summary",
+)
+def get_dashboard_summary():
+    query = """
+        SELECT
+            (SELECT COUNT(*) FROM assets) AS total_assets,
+            (SELECT COUNT(*) FROM services) AS total_services,
+            (SELECT COUNT(*) FROM vulnerabilities) AS total_vulnerabilities,
+            (SELECT COUNT(*) FROM findings) AS total_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE severity = 'CRITICAL'
+            ) AS critical_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE severity = 'HIGH'
+            ) AS high_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE severity = 'MEDIUM'
+            ) AS medium_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE severity = 'LOW'
+            ) AS low_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE severity = 'NONE'
+            ) AS none_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE severity = 'UNKNOWN'
+            ) AS unknown_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE status = 'OPEN'
+            ) AS open_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE status = 'IN_PROGRESS'
+            ) AS in_progress_findings,
+
+            (
+                SELECT COUNT(*)
+                FROM findings
+                WHERE status = 'RESOLVED'
+            ) AS resolved_findings;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                row = cur.fetchone()
+
+        return {
+            "assets": {
+                "total": row[0],
+            },
+            "services": {
+                "total": row[1],
+            },
+            "vulnerabilities": {
+                "total": row[2],
+            },
+            "findings": {
+                "total": row[3],
+                "severity": {
+                    "critical": row[4],
+                    "high": row[5],
+                    "medium": row[6],
+                    "low": row[7],
+                    "none": row[8],
+                    "unknown": row[9],
+                },
+                "status": {
+                    "open": row[10],
+                    "in_progress": row[11],
+                    "resolved": row[12],
+                },
+            },
+        }
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception(
+            "Failed to fetch dashboard summary"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
