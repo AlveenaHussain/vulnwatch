@@ -12,14 +12,19 @@ function App() {
 
   const [assets, setAssets] = useState([]);
   const [services, setServices] = useState([]);
+  const [vulnerabilities, setVulnerabilities] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [servicesLoading, setServicesLoading] = useState(false);
+  const [vulnerabilitiesLoading, setVulnerabilitiesLoading] =
+    useState(false);
 
   const [error, setError] = useState("");
   const [assetsError, setAssetsError] = useState("");
   const [servicesError, setServicesError] = useState("");
+  const [vulnerabilitiesError, setVulnerabilitiesError] =
+    useState("");
 
   const [activePage, setActivePage] = useState("Dashboard");
 
@@ -31,9 +36,15 @@ function App() {
         const responses = await Promise.all([
           fetch(`${API_BASE_URL}/api/v1/dashboard/summary`),
           fetch(`${API_BASE_URL}/api/v1/dashboard/risk-overview`),
-          fetch(`${API_BASE_URL}/api/v1/dashboard/recent-findings`),
-          fetch(`${API_BASE_URL}/api/v1/dashboard/severity-distribution`),
-          fetch(`${API_BASE_URL}/api/v1/dashboard/status-distribution`),
+          fetch(
+            `${API_BASE_URL}/api/v1/dashboard/recent-findings`
+          ),
+          fetch(
+            `${API_BASE_URL}/api/v1/dashboard/severity-distribution`
+          ),
+          fetch(
+            `${API_BASE_URL}/api/v1/dashboard/status-distribution`
+          ),
         ]);
 
         if (responses.some((response) => !response.ok)) {
@@ -53,7 +64,9 @@ function App() {
         setSummary(summaryData);
         setRiskOverview(riskData);
         setRecentFindings(findingsData.findings || []);
-        setSeverityDistribution(severityData.distribution || []);
+        setSeverityDistribution(
+          severityData.distribution || []
+        );
         setStatusDistribution(statusData.distribution || []);
         setError("");
       } catch (err) {
@@ -147,6 +160,49 @@ function App() {
     }
 
     loadServices();
+  }, []);
+
+  useEffect(() => {
+    async function loadVulnerabilities() {
+      try {
+        setVulnerabilitiesLoading(true);
+        setVulnerabilitiesError("");
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/v1/vulnerabilities`
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "Vulnerabilities API request failed"
+          );
+        }
+
+        const data = await response.json();
+
+        let normalizedVulnerabilities = [];
+
+        if (Array.isArray(data)) {
+          normalizedVulnerabilities = data;
+        } else if (Array.isArray(data?.vulnerabilities)) {
+          normalizedVulnerabilities = data.vulnerabilities;
+        } else if (Array.isArray(data?.items)) {
+          normalizedVulnerabilities = data.items;
+        }
+
+        setVulnerabilities(normalizedVulnerabilities);
+      } catch (err) {
+        console.error(err);
+        setVulnerabilities([]);
+        setVulnerabilitiesError(
+          "Unable to load vulnerabilities from VulnWatch backend."
+        );
+      } finally {
+        setVulnerabilitiesLoading(false);
+      }
+    }
+
+    loadVulnerabilities();
   }, []);
 
   const severityClass = (severity) =>
@@ -490,6 +546,12 @@ function App() {
       (item) => item.vulnerability_id
     ).length;
 
+    const uniqueTargets = new Set(
+      services
+        .map((item) => item.target_ip)
+        .filter(Boolean)
+    ).size;
+
     return (
       <main className="dashboard-content">
         <section className="hero-section">
@@ -543,13 +605,7 @@ function App() {
             </div>
 
             <div className="stat-value">
-              {servicesLoading
-                ? "—"
-                : new Set(
-                    services
-                      .map((item) => item.target_ip)
-                      .filter(Boolean)
-                  ).size}
+              {servicesLoading ? "—" : uniqueTargets}
             </div>
 
             <div className="stat-name">Target Assets</div>
@@ -659,13 +715,9 @@ function App() {
                         </strong>
                       </td>
 
-                      <td>
-                        {item.port ?? "N/A"}
-                      </td>
+                      <td>{item.port ?? "N/A"}</td>
 
-                      <td>
-                        {item.protocol || "N/A"}
-                      </td>
+                      <td>{item.protocol || "N/A"}</td>
 
                       <td>
                         <div className="finding-name">
@@ -673,13 +725,9 @@ function App() {
                         </div>
                       </td>
 
-                      <td>
-                        {item.product || "N/A"}
-                      </td>
+                      <td>{item.product || "N/A"}</td>
 
-                      <td>
-                        {item.version || "N/A"}
-                      </td>
+                      <td>{item.version || "N/A"}</td>
 
                       <td>
                         <span className="cve-code">
@@ -717,15 +765,287 @@ function App() {
     );
   };
 
+  const renderVulnerabilities = () => {
+    const criticalCount = vulnerabilities.filter(
+      (item) => item.severity === "CRITICAL"
+    ).length;
+
+    const highCount = vulnerabilities.filter(
+      (item) => item.severity === "HIGH"
+    ).length;
+
+    const mediumCount = vulnerabilities.filter(
+      (item) => item.severity === "MEDIUM"
+    ).length;
+
+    const averageCvss =
+      vulnerabilities.length > 0
+        ? (
+            vulnerabilities.reduce(
+              (total, item) =>
+                total + Number(item.cvss_score || 0),
+              0
+            ) / vulnerabilities.length
+          ).toFixed(1)
+        : "0.0";
+
+    return (
+      <main className="dashboard-content">
+        <section className="hero-section">
+          <div>
+            <div className="eyebrow">SECURITY</div>
+
+            <h1>Vulnerabilities</h1>
+
+            <p>
+              Review CVEs, severity, CVSS scores and vulnerability
+              metadata collected by VulnWatch.
+            </p>
+          </div>
+
+          <div className="hero-decoration">
+            <div className="scan-ring ring-one"></div>
+            <div className="scan-ring ring-two"></div>
+            <div className="scan-core">△</div>
+          </div>
+        </section>
+
+        {vulnerabilitiesError && (
+          <div className="error-banner">
+            <strong>Connection Error</strong>
+            <span>{vulnerabilitiesError}</span>
+          </div>
+        )}
+
+        <section className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon blue">△</span>
+              <span className="stat-category">THREATS</span>
+            </div>
+
+            <div className="stat-value">
+              {vulnerabilitiesLoading
+                ? "—"
+                : vulnerabilities.length}
+            </div>
+
+            <div className="stat-name">
+              Total Vulnerabilities
+            </div>
+
+            <div className="stat-line">
+              Vulnerabilities stored in VulnWatch
+            </div>
+          </div>
+
+          <div className="stat-card critical-card">
+            <div className="stat-top">
+              <span className="stat-icon red">!</span>
+              <span className="stat-category">CRITICAL</span>
+            </div>
+
+            <div className="stat-value">
+              {vulnerabilitiesLoading ? "—" : criticalCount}
+            </div>
+
+            <div className="stat-name">Critical</div>
+
+            <div className="stat-line">
+              Critical severity vulnerabilities
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon orange">▲</span>
+              <span className="stat-category">HIGH</span>
+            </div>
+
+            <div className="stat-value">
+              {vulnerabilitiesLoading ? "—" : highCount}
+            </div>
+
+            <div className="stat-name">High Severity</div>
+
+            <div className="stat-line">
+              High severity vulnerabilities
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon purple">◈</span>
+              <span className="stat-category">CVSS</span>
+            </div>
+
+            <div className="stat-value">
+              {vulnerabilitiesLoading ? "—" : averageCvss}
+            </div>
+
+            <div className="stat-name">Average CVSS</div>
+
+            <div className="stat-line">
+              Average CVSS score across vulnerabilities
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-card findings-card">
+          <div className="card-heading">
+            <div>
+              <span className="card-label">
+                VULNERABILITY DATABASE
+              </span>
+
+              <h2>Known Vulnerabilities</h2>
+            </div>
+
+            <div className="finding-total">
+              {vulnerabilities.length} vulnerabilities
+            </div>
+          </div>
+
+          <div className="table-container">
+            {vulnerabilitiesLoading ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  opacity: 0.7,
+                }}
+              >
+                Loading vulnerabilities...
+              </div>
+            ) : vulnerabilities.length === 0 ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  opacity: 0.7,
+                }}
+              >
+                No vulnerabilities found.
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>CVE</th>
+                    <th>DESCRIPTION</th>
+                    <th>CVSS</th>
+                    <th>SEVERITY</th>
+                    <th>CWE</th>
+                    <th>PUBLISHED</th>
+                    <th>LAST MODIFIED</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {vulnerabilities.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <span className="cve-code">
+                          {item.cve_id || "N/A"}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="finding-name">
+                          {item.description || "N/A"}
+                        </div>
+                      </td>
+
+                      <td>
+                        <strong className="risk-number-small">
+                          {item.cvss_score ?? "N/A"}
+                        </strong>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`severity-badge ${severityClass(
+                            item.severity
+                          )}`}
+                        >
+                          {item.severity || "N/A"}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className="cve-code">
+                          {item.cwe || "N/A"}
+                        </span>
+                      </td>
+
+                      <td>
+                        {item.published
+                          ? new Date(
+                              item.published
+                            ).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+
+                      <td>
+                        {item.last_modified
+                          ? new Date(
+                              item.last_modified
+                            ).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+
+        {vulnerabilities.length > 0 && (
+          <section className="dashboard-card">
+            <div className="card-heading">
+              <div>
+                <span className="card-label">
+                  VULNERABILITY DETAILS
+                </span>
+
+                <h2>CVSS & Classification</h2>
+              </div>
+            </div>
+
+            <div className="status-list">
+              {vulnerabilities.map((item) => (
+                <div
+                  className="status-row"
+                  key={`details-${item.id}`}
+                >
+                  <div>
+                    <span
+                      className={`severity-dot ${severityClass(
+                        item.severity
+                      )}`}
+                    ></span>
+
+                    <span>
+                      {item.cve_id || "Unknown CVE"}
+                    </span>
+                  </div>
+
+                  <strong>
+                    CVSS {item.cvss_score ?? "N/A"} ·{" "}
+                    {item.cvss_version || "N/A"}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+    );
+  };
+
   const renderPlaceholderPage = () => {
     const pageConfig = {
-      Vulnerabilities: {
-        icon: "△",
-        section: "SECURITY",
-        title: "Vulnerabilities",
-        description:
-          "Review vulnerabilities identified and mapped to discovered services.",
-      },
       Findings: {
         icon: "!",
         section: "SECURITY",
@@ -769,7 +1089,9 @@ function App() {
         <section className="dashboard-card">
           <div className="card-heading">
             <div>
-              <span className="card-label">VULNWATCH MODULE</span>
+              <span className="card-label">
+                VULNWATCH MODULE
+              </span>
 
               <h2>{page.title} Management</h2>
             </div>
@@ -808,7 +1130,8 @@ function App() {
                 opacity: 0.65,
               }}
             >
-              This module is ready for the next implementation phase.
+              This module is ready for the next implementation
+              phase.
             </p>
           </div>
         </section>
@@ -1299,6 +1622,8 @@ function App() {
           ? renderAssets()
           : activePage === "Services"
           ? renderServices()
+          : activePage === "Vulnerabilities"
+          ? renderVulnerabilities()
           : renderPlaceholderPage()}
       </div>
     </div>
