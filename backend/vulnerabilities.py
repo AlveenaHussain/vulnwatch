@@ -1420,3 +1420,60 @@ def get_dashboard_recent_findings():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+# ---------------------------------------------------------------------------
+# Dashboard - Severity Distribution
+# ---------------------------------------------------------------------------
+@router.get(
+    "/dashboard/severity-distribution",
+    summary="Get finding severity distribution",
+)
+def get_dashboard_severity_distribution():
+    query = """
+        SELECT
+            severity,
+            COUNT(*) AS finding_count
+        FROM findings
+        GROUP BY severity
+        ORDER BY
+            CASE severity
+                WHEN 'CRITICAL' THEN 1
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 3
+                WHEN 'LOW' THEN 4
+                WHEN 'NONE' THEN 5
+                WHEN 'UNKNOWN' THEN 6
+                ELSE 7
+            END;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                rows = cur.fetchall()
+
+        distribution = [
+            {
+                "severity": row[0],
+                "count": row[1],
+            }
+            for row in rows
+        ]
+
+        return {
+            "total_findings": sum(
+                item["count"]
+                for item in distribution
+            ),
+            "distribution": distribution,
+        }
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception(
+            "Failed to fetch dashboard severity distribution"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
