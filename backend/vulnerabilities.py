@@ -1477,3 +1477,57 @@ def get_dashboard_severity_distribution():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+# ---------------------------------------------------------------------------
+# Dashboard - Finding Status Distribution
+# ---------------------------------------------------------------------------
+@router.get(
+    "/dashboard/status-distribution",
+    summary="Get finding status distribution",
+)
+def get_dashboard_status_distribution():
+    query = """
+        SELECT
+            status,
+            COUNT(*) AS finding_count
+        FROM findings
+        GROUP BY status
+        ORDER BY
+            CASE status
+                WHEN 'OPEN' THEN 1
+                WHEN 'IN_PROGRESS' THEN 2
+                WHEN 'RESOLVED' THEN 3
+                ELSE 4
+            END;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                rows = cur.fetchall()
+
+        distribution = [
+            {
+                "status": row[0],
+                "count": row[1],
+            }
+            for row in rows
+        ]
+
+        return {
+            "total_findings": sum(
+                item["count"]
+                for item in distribution
+            ),
+            "distribution": distribution,
+        }
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception(
+            "Failed to fetch dashboard status distribution"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
