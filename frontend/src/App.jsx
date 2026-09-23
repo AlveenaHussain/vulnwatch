@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import "./App.css";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -19,6 +19,8 @@ function App() {
   // PAGE STATE
   // =========================================================
   const [activePage, setActivePage] = useState("Dashboard");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // =========================================================
   // ASSETS STATE
@@ -104,7 +106,7 @@ function App() {
     }
 
     loadDashboard();
-  }, []);
+  }, [refreshKey]);
 
   // =========================================================
   // ASSETS API
@@ -146,7 +148,7 @@ function App() {
     }
 
     loadAssets();
-  }, []);
+  }, [refreshKey]);
 
   // =========================================================
   // SERVICES API
@@ -188,7 +190,7 @@ function App() {
     }
 
     loadServices();
-  }, []);
+  }, [refreshKey]);
 
   // =========================================================
   // VULNERABILITIES API
@@ -234,7 +236,7 @@ function App() {
     }
 
     loadVulnerabilities();
-  }, []);
+  }, [refreshKey]);
 
   // =========================================================
   // FINDINGS API
@@ -276,7 +278,7 @@ function App() {
     }
 
     loadFindings();
-  }, []);
+  }, [refreshKey]);
 
   // =========================================================
   // SCANS API
@@ -318,7 +320,7 @@ function App() {
     }
 
     loadScans();
-  }, []);
+  }, [refreshKey]);
 
   // =========================================================
   // HELPERS
@@ -343,6 +345,17 @@ function App() {
 
   const handleNavigation = (page) => {
     setActivePage(page);
+  };
+
+  const handleRefresh = () => {
+    if (refreshing) return;
+
+    setRefreshing(true);
+    setRefreshKey((value) => value + 1);
+
+    window.setTimeout(() => {
+      setRefreshing(false);
+    }, 700);
   };
 
   // =========================================================
@@ -1405,10 +1418,11 @@ function App() {
 
           <div className="status-list">
             {vulnerabilities.map((item) => (
-              <div
-                className="status-row"
-                key={`classification-${item.id}`}
-              >
+              <Fragment key={item.id}>
+                <div
+                  className="status-row"
+                  key={`classification-${item.id}`}
+                >
                 <div>
                   <span
                     className={`status-dot ${severityClass(
@@ -1424,6 +1438,23 @@ function App() {
                   {item.cvss_version || "N/A"}
                 </strong>
               </div>
+
+              <div className="status-row" key={`vector-${item.id}`}>
+                <div>
+                  <span className="status-dot resolved"></span>
+                  <span>{item.cve_id} Vector</span>
+                </div>
+                <code>{item.cvss_vector || "N/A"}</code>
+              </div>
+
+                <div className="status-row" key={`sync-${item.id}`}>
+                  <div>
+                    <span className="status-dot resolved"></span>
+                    <span>NVD Sync</span>
+                  </div>
+                  <strong>{formatDate(item.nvd_synced_at)}</strong>
+                </div>
+              </Fragment>
             ))}
           </div>
         </section>
@@ -1775,6 +1806,47 @@ function App() {
                 )}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="dashboard-card">
+          <div className="card-heading">
+            <div>
+              <span className="card-label">REMEDIATION</span>
+              <h2>Recommended Actions</h2>
+            </div>
+            <div className="finding-total">
+              {findings.filter((item) => item.remediation).length} with guidance
+            </div>
+          </div>
+
+          <div className="remediation-list">
+            {findings.map((finding) => (
+              <div className="remediation-item" key={`remediation-${finding.id}`}>
+                <div className="remediation-header">
+                  <div>
+                    <strong>
+                      #{finding.id} · {finding.title || "Security Finding"}
+                    </strong>
+                    <span>
+                      {finding.cve_id || "No CVE"} · {finding.target_ip || "Unknown target"}
+                    </span>
+                  </div>
+                  <span className={`severity-badge ${severityClass(finding.severity)}`}>
+                    {finding.severity || "UNKNOWN"}
+                  </span>
+                </div>
+                <p>
+                  {finding.remediation || "No remediation guidance is available for this finding."}
+                </p>
+              </div>
+            ))}
+
+            {!findingsLoading && findings.length === 0 && (
+              <div className="status-row">
+                <div><span>No remediation items available.</span></div>
+              </div>
+            )}
           </div>
         </section>
       </>
@@ -2176,8 +2248,25 @@ function App() {
 
           <div className="topbar-right">
             <div className="last-scan">
-              Last scan data available
+              {scans.length > 0
+                ? `Latest scan: ${formatDate(
+                    [...scans].sort(
+                      (a, b) =>
+                        new Date(b.created_at || 0) -
+                        new Date(a.created_at || 0)
+                    )[0]?.created_at
+                  )}`
+                : "No scan data"}
             </div>
+
+            <button
+              type="button"
+              className={`refresh-button ${refreshing ? "refreshing" : ""}`}
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? "Refreshing..." : "Refresh data"}
+            </button>
 
             <div className="backend-status">
               <span className="online-dot"></span>
