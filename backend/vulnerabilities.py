@@ -1341,3 +1341,82 @@ def get_dashboard_risk_overview():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
+
+# ---------------------------------------------------------------------------
+# Dashboard - Recent Findings
+# ---------------------------------------------------------------------------
+@router.get(
+    "/dashboard/recent-findings",
+    summary="Get recent security findings",
+)
+def get_dashboard_recent_findings():
+    query = """
+        SELECT
+            f.id,
+            f.title,
+            f.severity,
+            f.risk_score,
+            f.status,
+            f.first_seen,
+            f.last_seen,
+            a.ip_address::text AS target_ip,
+            a.hostname,
+            s.port,
+            s.protocol,
+            v.cve_id
+        FROM findings f
+        JOIN service_vulnerabilities sv
+            ON sv.id = f.service_vulnerability_id
+        JOIN services s
+            ON s.id = sv.service_id
+        JOIN assets a
+            ON a.id = s.asset_id
+        JOIN vulnerabilities v
+            ON v.id = sv.vulnerability_id
+        ORDER BY
+            f.last_seen DESC,
+            f.id DESC
+        LIMIT 10;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                rows = cur.fetchall()
+
+        findings = [
+            {
+                "id": row[0],
+                "title": row[1],
+                "severity": row[2],
+                "risk_score": (
+                    float(row[3])
+                    if row[3] is not None
+                    else None
+                ),
+                "status": row[4],
+                "first_seen": row[5],
+                "last_seen": row[6],
+                "target_ip": row[7],
+                "hostname": row[8],
+                "port": row[9],
+                "protocol": row[10],
+                "cve_id": row[11],
+            }
+            for row in rows
+        ]
+
+        return {
+            "count": len(findings),
+            "findings": findings,
+        }
+
+    except (psycopg.Error, RuntimeError):
+        logger.exception(
+            "Failed to fetch recent dashboard findings"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
