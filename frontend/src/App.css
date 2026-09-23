@@ -881,9 +881,23 @@ tbody tr:hover {
     display: none;
   }
 
+  /* COLLAPSED SIDEBAR - ICONS ONLY */
   .nav-item {
     justify-content: center;
     padding: 0;
+    gap: 0;
+    font-size: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .nav-icon {
+    width: 19px;
+    min-width: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
   }
 
   .main-area {
@@ -950,5 +964,182 @@ tbody tr:hover {
   .risk-main {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+/* =========================================================
+   PHASE 9 - REFRESH + REMEDIATION + SECURITY DETAILS
+========================================================= */
+
+.refresh-button {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2b3c5b;
+  border-radius: 7px;
+  background: #111c30;
+  color: #9fb5e8;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease,
+    opacity 0.2s ease;
+}
+
+.refresh-button:hover {
+  background: #172641;
+  border-color: #45649a;
+  color: #d8e4ff;
+}
+
+.refresh-button:active {
+  transform: translateY(1px);
+}
+
+.refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.refresh-button.refreshing {
+  border-color: #45649a;
+  color: #b8caff;
+}
+
+.remediation-list {
+  padding: 6px 20px 20px;
+}
+
+.remediation-item {
+  padding: 17px 0;
+  border-bottom: 1px solid #192438;
+}
+
+.remediation-item:last-child {
+  border-bottom: 0;
+}
+
+.remediation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.remediation-header > div {
+  min-width: 0;
+}
+
+.remediation-header strong {
+  display: block;
+  color: #dce4f1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.remediation-header span {
+  display: block;
+  margin-top: 5px;
+  color: #66758e;
+  font-size: 9px;
+}
+
+.remediation-item p {
+  margin: 10px 0 0;
+  max-width: 900px;
+  color: #8997ac;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.status-row code {
+  max-width: 58%;
+  overflow-x: auto;
+  padding: 5px 8px;
+  border: 1px solid #202f47;
+  border-radius: 5px;
+  background: #09111f;
+  color: #88a9ff;
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.status-row > strong {
+  max-width: 62%;
+  overflow-x: auto;
+  color: #d3dbea;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+}
+
+@media (max-width: 800px) {
+  .refresh-button {
+    padding: 0 9px;
+    font-size: 9px;
+  }
+
+  .topbar-right {
+    gap: 9px;
+  }
+
+  .remediation-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .remediation-header .severity-badge {
+    align-self: flex-start;
+  }
+
+  .status-row code {
+    max-width: 50%;
+  }
+
+  .status-row > strong {
+    max-width: 50%;
+  }
+}
+
+@media (max-width: 560px) {
+  .refresh-button {
+    width: 32px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .refresh-button::before {
+    content: "↻";
+    font-size: 16px;
+  }
+
+  .status-row {
+    gap: 10px;
+  }
+
+  .status-row > div {
+    min-width: 0;
+  }
+
+  .status-row code,
+  .status-row > strong {
+    max-width: 48%;
+  }
+
+  .remediation-list {
+    padding-left: 15px;
+    padding-right: 15px;
   }
 }
