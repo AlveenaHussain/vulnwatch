@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from database import check_database, get_connection
@@ -13,6 +14,15 @@ app = FastAPI(
     title="VulnWatch API",
     description="Vulnerability Assessment and Security Monitoring platform",
     version="0.1.0",
+)
+
+# Allow the React frontend to communicate with the FastAPI backend.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(scan_import_router)
