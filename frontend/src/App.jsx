@@ -9,8 +9,13 @@ function App() {
   const [recentFindings, setRecentFindings] = useState([]);
   const [severityDistribution, setSeverityDistribution] = useState([]);
   const [statusDistribution, setStatusDistribution] = useState([]);
+
+  const [assets, setAssets] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [assetsError, setAssetsError] = useState("");
 
   const [activePage, setActivePage] = useState("Dashboard");
 
@@ -58,6 +63,56 @@ function App() {
     loadDashboard();
   }, []);
 
+  useEffect(() => {
+    async function loadAssets() {
+      try {
+        setAssetsLoading(true);
+        setAssetsError("");
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/v1/assets`
+        );
+
+        if (!response.ok) {
+          throw new Error("Assets API request failed");
+        }
+
+        const data = await response.json();
+
+        /*
+         * Assets API may return:
+         * 1. Direct array: [...]
+         * 2. { assets: [...] }
+         * 3. { items: [...] }
+         *
+         * Normalize everything into an array so the UI
+         * can safely use map(), filter(), forEach(), etc.
+         */
+        let normalizedAssets = [];
+
+        if (Array.isArray(data)) {
+          normalizedAssets = data;
+        } else if (Array.isArray(data?.assets)) {
+          normalizedAssets = data.assets;
+        } else if (Array.isArray(data?.items)) {
+          normalizedAssets = data.items;
+        }
+
+        setAssets(normalizedAssets);
+      } catch (err) {
+        console.error(err);
+        setAssets([]);
+        setAssetsError(
+          "Unable to load assets from VulnWatch backend."
+        );
+      } finally {
+        setAssetsLoading(false);
+      }
+    }
+
+    loadAssets();
+  }, []);
+
   const severityClass = (severity) =>
     severity?.toLowerCase() || "unknown";
 
@@ -68,15 +123,330 @@ function App() {
     setActivePage(page);
   };
 
+  const getUniqueAssets = () => {
+    const assetMap = new Map();
+
+    assets.forEach((item) => {
+      if (!assetMap.has(item.asset_id)) {
+        assetMap.set(item.asset_id, {
+          asset_id: item.asset_id,
+          target_ip: item.target_ip,
+          hostname: item.hostname,
+          os: item.os || "Linux",
+          services: 0,
+          vulnerabilities: 0,
+        });
+      }
+
+      const asset = assetMap.get(item.asset_id);
+
+      if (item.service_id) {
+        asset.services += 1;
+      }
+
+      if (item.vulnerability_id) {
+        asset.vulnerabilities += 1;
+      }
+    });
+
+    return Array.from(assetMap.values());
+  };
+
+  const renderAssets = () => {
+    const uniqueAssets = getUniqueAssets();
+
+    const totalServices = assets.filter(
+      (item) => item.service_id
+    ).length;
+
+    const totalVulnerabilities = new Set(
+      assets
+        .filter((item) => item.vulnerability_id)
+        .map((item) => item.vulnerability_id)
+    ).size;
+
+    return (
+      <main className="dashboard-content">
+        <section className="hero-section">
+          <div>
+            <div className="eyebrow">MONITORING</div>
+
+            <h1>Assets</h1>
+
+            <p>
+              View and manage infrastructure assets discovered by
+              VulnWatch.
+            </p>
+          </div>
+
+          <div className="hero-decoration">
+            <div className="scan-ring ring-one"></div>
+            <div className="scan-ring ring-two"></div>
+            <div className="scan-core">◉</div>
+          </div>
+        </section>
+
+        {assetsError && (
+          <div className="error-banner">
+            <strong>Connection Error</strong>
+            <span>{assetsError}</span>
+          </div>
+        )}
+
+        <section className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon blue">◉</span>
+              <span className="stat-category">
+                INFRASTRUCTURE
+              </span>
+            </div>
+
+            <div className="stat-value">
+              {assetsLoading ? "—" : uniqueAssets.length}
+            </div>
+
+            <div className="stat-name">Total Assets</div>
+
+            <div className="stat-line">
+              Assets currently stored in VulnWatch
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon purple">⌁</span>
+              <span className="stat-category">DISCOVERY</span>
+            </div>
+
+            <div className="stat-value">
+              {assetsLoading ? "—" : uniqueAssets.length}
+            </div>
+
+            <div className="stat-name">Discovered</div>
+
+            <div className="stat-line">
+              Infrastructure discovered through scanning
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-top">
+              <span className="stat-icon orange">✓</span>
+              <span className="stat-category">SERVICES</span>
+            </div>
+
+            <div className="stat-value">
+              {assetsLoading ? "—" : totalServices}
+            </div>
+
+            <div className="stat-name">Services</div>
+
+            <div className="stat-line">
+              Services mapped to discovered assets
+            </div>
+          </div>
+
+          <div className="stat-card critical-card">
+            <div className="stat-top">
+              <span className="stat-icon red">!</span>
+              <span className="stat-category">SECURITY</span>
+            </div>
+
+            <div className="stat-value">
+              {assetsLoading ? "—" : totalVulnerabilities}
+            </div>
+
+            <div className="stat-name">Vulnerabilities</div>
+
+            <div className="stat-line">
+              Vulnerabilities associated with assets
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-card findings-card">
+          <div className="card-heading">
+            <div>
+              <span className="card-label">
+                INFRASTRUCTURE INVENTORY
+              </span>
+
+              <h2>Discovered Assets</h2>
+            </div>
+
+            <div className="finding-total">
+              {uniqueAssets.length} assets
+            </div>
+          </div>
+
+          <div className="table-container">
+            {assetsLoading ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  opacity: 0.7,
+                }}
+              >
+                Loading assets...
+              </div>
+            ) : uniqueAssets.length === 0 ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  opacity: 0.7,
+                }}
+              >
+                No assets found.
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>TARGET</th>
+                    <th>HOSTNAME</th>
+                    <th>OPERATING SYSTEM</th>
+                    <th>SERVICES</th>
+                    <th>VULNERABILITIES</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {uniqueAssets.map((asset) => (
+                    <tr key={asset.asset_id}>
+                      <td>
+                        <strong>#{asset.asset_id}</strong>
+                      </td>
+
+                      <td>
+                        <strong>{asset.target_ip}</strong>
+                      </td>
+
+                      <td>
+                        <div className="finding-name">
+                          {asset.hostname || "N/A"}
+                        </div>
+                      </td>
+
+                      <td>{asset.os}</td>
+
+                      <td>
+                        <span className="cve-code">
+                          {asset.services}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`severity-badge ${
+                            asset.vulnerabilities > 0
+                              ? "critical"
+                              : "none"
+                          }`}
+                        >
+                          {asset.vulnerabilities}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+
+        {!assetsLoading && assets.length > 0 && (
+          <section className="dashboard-card findings-card">
+            <div className="card-heading">
+              <div>
+                <span className="card-label">
+                  DISCOVERED SERVICES
+                </span>
+
+                <h2>Asset Security Details</h2>
+              </div>
+
+              <div className="finding-total">
+                {assets.length} records
+              </div>
+            </div>
+
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SERVICE</th>
+                    <th>PRODUCT</th>
+                    <th>VERSION</th>
+                    <th>PORT</th>
+                    <th>CVE</th>
+                    <th>SEVERITY</th>
+                    <th>CVSS</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {assets.map((item, index) => (
+                    <tr
+                      key={`${item.asset_id}-${item.service_id}-${index}`}
+                    >
+                      <td>
+                        <div className="finding-name">
+                          {item.service_name || "N/A"}
+                        </div>
+                      </td>
+
+                      <td>{item.product || "N/A"}</td>
+
+                      <td>{item.version || "N/A"}</td>
+
+                      <td>
+                        {item.port
+                          ? `${item.port}/${item.protocol || ""}`
+                          : "N/A"}
+                      </td>
+
+                      <td>
+                        <span className="cve-code">
+                          {item.cve_id || "N/A"}
+                        </span>
+                      </td>
+
+                      <td>
+                        {item.severity ? (
+                          <span
+                            className={`severity-badge ${severityClass(
+                              item.severity
+                            )}`}
+                          >
+                            {item.severity}
+                          </span>
+                        ) : (
+                          "N/A"
+                        )}
+                      </td>
+
+                      <td>
+                        <strong className="risk-number-small">
+                          {item.cvss_score ?? "N/A"}
+                        </strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+      </main>
+    );
+  };
+
   const renderPlaceholderPage = () => {
     const pageConfig = {
-      Assets: {
-        icon: "◉",
-        section: "MONITORING",
-        title: "Assets",
-        description:
-          "View and manage infrastructure assets discovered by VulnWatch.",
-      },
       Services: {
         icon: "⌘",
         section: "MONITORING",
@@ -135,6 +505,7 @@ function App() {
           <div className="card-heading">
             <div>
               <span className="card-label">VULNWATCH MODULE</span>
+
               <h2>{page.title} Management</h2>
             </div>
 
@@ -183,7 +554,6 @@ function App() {
   const renderDashboard = () => {
     return (
       <main className="dashboard-content">
-        {/* HERO */}
         <section className="hero-section">
           <div>
             <div className="eyebrow">SECURITY OVERVIEW</div>
@@ -191,8 +561,8 @@ function App() {
             <h1>Security Dashboard</h1>
 
             <p>
-              Monitor assets, vulnerabilities, findings and security
-              risk from one centralized view.
+              Monitor assets, vulnerabilities, findings and
+              security risk from one centralized view.
             </p>
           </div>
 
@@ -203,7 +573,6 @@ function App() {
           </div>
         </section>
 
-        {/* ERROR */}
         {error && (
           <div className="error-banner">
             <strong>Connection Error</strong>
@@ -211,12 +580,13 @@ function App() {
           </div>
         )}
 
-        {/* STATS */}
         <section className="stats-grid">
           <div className="stat-card">
             <div className="stat-top">
               <span className="stat-icon blue">◉</span>
-              <span className="stat-category">INFRASTRUCTURE</span>
+              <span className="stat-category">
+                INFRASTRUCTURE
+              </span>
             </div>
 
             <div className="stat-value">
@@ -254,7 +624,9 @@ function App() {
             </div>
 
             <div className="stat-value">
-              {loading ? "—" : summary?.vulnerabilities?.total ?? 0}
+              {loading
+                ? "—"
+                : summary?.vulnerabilities?.total ?? 0}
             </div>
 
             <div className="stat-name">Vulnerabilities</div>
@@ -282,14 +654,15 @@ function App() {
           </div>
         </section>
 
-        {/* ANALYTICS */}
         {!loading && !error && (
           <section className="analytics-grid">
-            {/* RISK */}
             <div className="dashboard-card risk-card">
               <div className="card-heading">
                 <div>
-                  <span className="card-label">RISK ANALYSIS</span>
+                  <span className="card-label">
+                    RISK ANALYSIS
+                  </span>
+
                   <h2>Risk Overview</h2>
                 </div>
 
@@ -343,11 +716,13 @@ function App() {
               </div>
             </div>
 
-            {/* SEVERITY */}
             <div className="dashboard-card">
               <div className="card-heading">
                 <div>
-                  <span className="card-label">THREAT LEVEL</span>
+                  <span className="card-label">
+                    THREAT LEVEL
+                  </span>
+
                   <h2>Severity Distribution</h2>
                 </div>
               </div>
@@ -392,11 +767,11 @@ function App() {
               </div>
             </div>
 
-            {/* STATUS */}
             <div className="dashboard-card">
               <div className="card-heading">
                 <div>
                   <span className="card-label">WORKFLOW</span>
+
                   <h2>Finding Status</h2>
                 </div>
               </div>
@@ -427,12 +802,14 @@ function App() {
           </section>
         )}
 
-        {/* FINDINGS */}
         {!loading && !error && (
           <section className="dashboard-card findings-card">
             <div className="card-heading">
               <div>
-                <span className="card-label">SECURITY EVENTS</span>
+                <span className="card-label">
+                  SECURITY EVENTS
+                </span>
+
                 <h2>Recent Findings</h2>
               </div>
 
@@ -464,7 +841,8 @@ function App() {
                         </div>
 
                         <div className="finding-sub">
-                          {finding.hostname || "metasploitable"}
+                          {finding.hostname ||
+                            "metasploitable"}
                         </div>
                       </td>
 
@@ -508,7 +886,10 @@ function App() {
                             finding.status
                           )}`}
                         >
-                          {finding.status?.replace("_", " ")}
+                          {finding.status?.replace(
+                            "_",
+                            " "
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -524,13 +905,13 @@ function App() {
 
   return (
     <div className="app-shell">
-      {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-icon">V</div>
 
           <div>
             <div className="brand-name">VulnWatch</div>
+
             <div className="brand-version">
               Security Platform
             </div>
@@ -582,7 +963,9 @@ function App() {
                 ? "active"
                 : ""
             }`}
-            onClick={() => handleNavigation("Vulnerabilities")}
+            onClick={() =>
+              handleNavigation("Vulnerabilities")
+            }
           >
             <span className="nav-icon">△</span>
             Vulnerabilities
@@ -623,9 +1006,7 @@ function App() {
         </div>
       </aside>
 
-      {/* MAIN */}
       <div className="main-area">
-        {/* TOPBAR */}
         <header className="topbar">
           <div className="breadcrumb">
             <span>Security</span>
@@ -649,6 +1030,8 @@ function App() {
 
         {activePage === "Dashboard"
           ? renderDashboard()
+          : activePage === "Assets"
+          ? renderAssets()
           : renderPlaceholderPage()}
       </div>
     </div>
