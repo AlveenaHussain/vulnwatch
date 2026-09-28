@@ -8,6 +8,7 @@ from database import check_database, get_connection
 from scan_import import router as scan_import_router
 from vulnerabilities import router as vulnerability_router
 from security_events import router as security_events_router
+from alerts import router as alerts_router
 
 logger = logging.getLogger("vulnwatch")
 
@@ -29,6 +30,7 @@ app.add_middleware(
 app.include_router(scan_import_router)
 app.include_router(vulnerability_router)
 app.include_router(security_events_router)
+app.include_router(alerts_router)
 
 
 @app.get("/health")
