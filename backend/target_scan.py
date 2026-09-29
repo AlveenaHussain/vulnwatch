@@ -67,6 +67,17 @@ SCANNER_IP = os.getenv(
 )
 
 
+# A RUNNING job older than this is considered stale.
+# This prevents a crashed/offline Kali agent from leaving
+# a scan permanently stuck in RUNNING state.
+STALE_JOB_MINUTES = int(
+    os.getenv(
+        "VULNWATCH_STALE_JOB_MINUTES",
+        "15",
+    )
+)
+
+
 class TargetScanStartRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -100,6 +111,43 @@ def normalize_ip(value: str) -> str:
     """
     return str(
         ipaddress.ip_interface(value).ip
+    )
+
+
+def recover_stale_running_jobs(
+    cursor,
+) -> None:
+    """
+    Mark abandoned RUNNING jobs as FAILED.
+
+    A job is considered stale when its updated_at timestamp
+    is older than VULNWATCH_STALE_JOB_MINUTES.
+
+    This recovery is intentionally performed during normal
+    target-scan API activity, so no separate scheduler/cron
+    process is required for the current lab architecture.
+    """
+
+    cursor.execute(
+        """
+        UPDATE scan_jobs
+        SET
+            status = 'FAILED',
+            error_message = %s,
+            updated_at = NOW()
+        WHERE status = 'RUNNING'
+          AND updated_at < (
+              NOW() - (%s * INTERVAL '1 minute')
+          )
+        """,
+        (
+            (
+                "Scan job automatically marked as FAILED "
+                "because the scanner did not report activity "
+                f"for {STALE_JOB_MINUTES} minutes."
+            ),
+            STALE_JOB_MINUTES,
+        ),
     )
 
 
@@ -245,7 +293,9 @@ def parse_nmap_xml(
             continue
 
         try:
-            normalized_host_ip = normalize_ip(ipv4_address)
+            normalized_host_ip = normalize_ip(
+                ipv4_address
+            )
         except ValueError:
             continue
 
@@ -264,7 +314,9 @@ def parse_nmap_xml(
         hostnames_node = host.find("hostnames")
 
         if hostnames_node is not None:
-            for hostname_node in hostnames_node.findall("hostname"):
+            for hostname_node in hostnames_node.findall(
+                "hostname"
+            ):
                 name = hostname_node.get("name")
 
                 if name:
@@ -394,6 +446,11 @@ def start_target_scan(
     with get_connection() as connection:
         with connection.cursor() as cursor:
 
+            # Recover abandoned jobs before checking whether
+            # the requested target is currently busy.
+            recover_stale_running_jobs(cursor)
+
+            # Existing duplicate-scan protection is preserved.
             cursor.execute(
                 """
                 SELECT id
@@ -462,22 +519,58 @@ def get_target_scan_job(
     with get_connection() as connection:
         with connection.cursor() as cursor:
 
+            # Also recover stale jobs when the frontend polls
+            # an existing job.
+            recover_stale_running_jobs(cursor)
+
             cursor.execute(
                 """
                 SELECT
-                    id,
-                    target_input,
-                    target_ip::text,
-                    scanner_ip::text,
-                    status,
-                    nmap_command,
-                    error_message,
-                    created_at,
-                    started_at,
-                    completed_at,
-                    updated_at
-                FROM scan_jobs
-                WHERE id = %s
+                    sj.id,
+                    sj.target_input,
+                    sj.target_ip::text,
+                    sj.scanner_ip::text,
+                    sj.status,
+                    sj.nmap_command,
+                    sj.error_message,
+                    sj.created_at,
+                    sj.started_at,
+                    sj.completed_at,
+                    sj.updated_at,
+                    asset_match.asset_id,
+                    scan_match.scan_id
+                FROM scan_jobs AS sj
+
+                LEFT JOIN LATERAL (
+                    SELECT
+                        a.id AS asset_id
+                    FROM assets AS a
+                    WHERE a.ip_address = sj.target_ip
+                    ORDER BY
+                        a.last_seen DESC NULLS LAST,
+                        a.id DESC
+                    LIMIT 1
+                ) AS asset_match
+                    ON TRUE
+
+                LEFT JOIN LATERAL (
+                    SELECT
+                        s.id AS scan_id
+                    FROM scans AS s
+                    WHERE s.target = sj.target_ip
+                      AND s.created_at >= sj.created_at
+                      AND (
+                          sj.completed_at IS NULL
+                          OR s.created_at <= sj.completed_at
+                      )
+                    ORDER BY
+                        s.created_at DESC,
+                        s.id DESC
+                    LIMIT 1
+                ) AS scan_match
+                    ON TRUE
+
+                WHERE sj.id = %s
                 """,
                 (job_id,),
             )
@@ -492,6 +585,7 @@ def get_target_scan_job(
 
     return {
         "id": row[0],
+        "job_id": row[0],
         "target_input": row[1],
         "target_ip": row[2],
         "scanner_ip": row[3],
@@ -502,6 +596,8 @@ def get_target_scan_job(
         "started_at": row[8],
         "completed_at": row[9],
         "updated_at": row[10],
+        "asset_id": row[11],
+        "scan_id": row[12],
     }
 
 
@@ -515,6 +611,10 @@ def get_next_target_scan_job():
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+
+            # Recover abandoned RUNNING jobs before selecting
+            # the next pending job for Kali.
+            recover_stale_running_jobs(cursor)
 
             cursor.execute(
                 """
@@ -593,6 +693,9 @@ async def submit_target_scan_result(
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+
+            # Recover stale jobs before validating the result.
+            recover_stale_running_jobs(cursor)
 
             cursor.execute(
                 """
@@ -730,6 +833,10 @@ def report_target_scan_failure(
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+
+            # Recover other abandoned jobs before processing
+            # the current failure report.
+            recover_stale_running_jobs(cursor)
 
             cursor.execute(
                 """
