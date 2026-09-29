@@ -1,18 +1,23 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import get_connection
+from database import check_database, get_connection
+from security import require_api_key
 from scan_import import router as scan_import_router
 from vulnerabilities import router as vulnerabilities_router
 from security_events import router as security_events_router
 from alerts import router as alerts_router
 from correlations import router as correlations_router
 from investigations import router as investigations_router
+from target_scan import router as target_scan_router
 
 
 app = FastAPI(
     title="VulnWatch API",
-    version="0.1.0",
+    version="1.0.0",
+    description="Vulnerability management and security monitoring API",
 )
 
 
@@ -34,118 +39,144 @@ app.include_router(security_events_router)
 app.include_router(alerts_router)
 app.include_router(correlations_router)
 app.include_router(investigations_router)
+app.include_router(target_scan_router)
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 def health():
-    return {"status": "ok"}
-
-
-@app.get("/health/db")
-def health_db():
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1;")
-            cur.fetchone()
-
     return {
         "status": "ok",
-        "database": "connected",
+        "service": "vulnwatch-backend",
     }
 
 
-@app.get("/api/v1/assets")
+@app.get("/health/db", tags=["health"])
+def database_health():
+    try:
+        if check_database():
+            return {
+                "status": "ok",
+                "database": "connected",
+            }
+
+        return {
+            "status": "error",
+            "database": "unavailable",
+        }
+
+    except Exception as exc:
+        return {
+            "status": "error",
+            "database": "unavailable",
+            "detail": str(exc),
+        }
+
+
+@app.get("/api/v1/assets", tags=["assets"])
 def get_assets():
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
                 """
                 SELECT
                     id,
                     ip_address::text,
+                    mac_address,
                     hostname,
-                    NULL::text AS os_name,
-                    NULL::text AS mac_address,
+                    os AS os_name,
+                    os_accuracy,
                     first_seen,
                     last_seen
                 FROM assets
-                ORDER BY id;
+                ORDER BY id
                 """
             )
-            rows = cur.fetchall()
 
-    return {
-        "count": len(rows),
-        "assets": [
+            rows = cursor.fetchall()
+
+    assets = []
+
+    for row in rows:
+        assets.append(
             {
                 "id": row[0],
                 "ip_address": row[1],
-                "hostname": row[2],
-                "os_name": row[3],
-                "mac_address": row[4],
-                "first_seen": row[5],
-                "last_seen": row[6],
+                "mac_address": row[2],
+                "hostname": row[3],
+                "os_name": row[4],
+                "os_accuracy": row[5],
+                "first_seen": row[6],
+                "last_seen": row[7],
             }
-            for row in rows
-        ],
+        )
+
+    return {
+        "count": len(assets),
+        "assets": assets,
     }
 
 
-@app.get("/api/v1/services")
+@app.get("/api/v1/services", tags=["services"])
 def get_services():
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
                 """
                 SELECT
                     s.id,
                     s.asset_id,
-                    a.ip_address::text,
+                    a.ip_address::text AS target_ip,
+                    a.hostname,
                     s.port,
                     s.protocol,
+                    s.state,
                     s.service_name,
                     s.product,
                     s.version,
-                    s.state,
+                    s.cpe,
                     s.first_seen,
                     s.last_seen
                 FROM services s
                 JOIN assets a
                     ON a.id = s.asset_id
-                ORDER BY
-                    a.ip_address,
-                    s.port,
-                    s.protocol;
+                ORDER BY s.id
                 """
             )
-            rows = cur.fetchall()
 
-    return {
-        "count": len(rows),
-        "services": [
+            rows = cursor.fetchall()
+
+    services = []
+
+    for row in rows:
+        services.append(
             {
                 "id": row[0],
                 "asset_id": row[1],
                 "target_ip": row[2],
-                "port": row[3],
-                "protocol": row[4],
-                "service_name": row[5],
-                "product": row[6],
-                "version": row[7],
-                "state": row[8],
-                "first_seen": row[9],
-                "last_seen": row[10],
+                "hostname": row[3],
+                "port": row[4],
+                "protocol": row[5],
+                "state": row[6],
+                "service_name": row[7],
+                "product": row[8],
+                "version": row[9],
+                "cpe": row[10],
+                "first_seen": row[11],
+                "last_seen": row[12],
             }
-            for row in rows
-        ],
+        )
+
+    return {
+        "count": len(services),
+        "services": services,
     }
 
 
-@app.get("/api/v1/scans")
+@app.get("/api/v1/scans", tags=["scans"])
 def get_scans():
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
                 """
                 SELECT
                     id,
@@ -155,16 +186,16 @@ def get_scans():
                     started_at,
                     created_at
                 FROM scans
-                ORDER BY
-                    started_at DESC,
-                    id DESC;
+                ORDER BY started_at DESC, id DESC
                 """
             )
-            rows = cur.fetchall()
 
-    return {
-        "count": len(rows),
-        "scans": [
+            rows = cursor.fetchall()
+
+    scans = []
+
+    for row in rows:
+        scans.append(
             {
                 "id": row[0],
                 "target": row[1],
@@ -173,6 +204,19 @@ def get_scans():
                 "started_at": row[4],
                 "created_at": row[5],
             }
-            for row in rows
-        ],
+        )
+
+    return {
+        "count": len(scans),
+        "scans": scans,
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+    )

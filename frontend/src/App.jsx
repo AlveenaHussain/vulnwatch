@@ -20,6 +20,19 @@ function App() {
   const [findings, setFindings] = useState([]);
   const [scans, setScans] = useState([]);
 
+  const [targetScan, setTargetScan] = useState({
+    target: "",
+    jobId: null,
+    status: "",
+    errorMessage: "",
+    createdAt: null,
+    startedAt: null,
+    completedAt: null,
+  });
+  const [targetScanStarting, setTargetScanStarting] = useState(false);
+  const [targetScanLoading, setTargetScanLoading] = useState(false);
+  const [targetScanError, setTargetScanError] = useState("");
+
   const [alerts, setAlerts] = useState([]);
   const [correlations, setCorrelations] = useState([]);
   const [securityEvents, setSecurityEvents] = useState([]);
@@ -142,6 +155,337 @@ function App() {
     window.setTimeout(() => {
       setRefreshing(false);
     }, 700);
+  };
+
+  const updateTargetScanJob = async (jobId) => {
+    try {
+      setTargetScanLoading(true);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/target-scan/jobs/${jobId}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Target scan status request failed");
+      }
+
+      const data = await response.json();
+
+      setTargetScan((current) => ({
+        ...current,
+        jobId: data.job_id,
+        target: data.target_input || current.target,
+        status: data.status || "",
+        errorMessage: data.error_message || "",
+        createdAt: data.created_at || null,
+        startedAt: data.started_at || null,
+        completedAt: data.completed_at || null,
+      }));
+
+      setTargetScanError("");
+
+      return data;
+    } catch (err) {
+      console.error(err);
+      setTargetScanError("Unable to read target scan status.");
+      return null;
+    } finally {
+      setTargetScanLoading(false);
+    }
+  };
+
+  const handleStartTargetScan = async () => {
+    const target = targetScan.target.trim();
+
+    if (!target) {
+      setTargetScanError("Enter a target IP address first.");
+      return;
+    }
+
+    setTargetScanStarting(true);
+    setTargetScanError("");
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/target-scan/start`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ target }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to create target scan job."
+        );
+      }
+
+      setTargetScan((current) => ({
+        ...current,
+        target: data.target || target,
+        jobId: data.job_id,
+        status: data.status || "PENDING",
+        errorMessage: "",
+        createdAt: data.created_at || null,
+        startedAt: null,
+        completedAt: null,
+      }));
+
+      await updateTargetScanJob(data.job_id);
+      setRefreshKey((value) => value + 1);
+    } catch (err) {
+      console.error(err);
+      setTargetScanError(err.message || "Unable to start target scan.");
+    } finally {
+      setTargetScanStarting(false);
+    }
+  };
+
+  useEffect(() => {
+    const jobId = targetScan.jobId;
+
+    if (!jobId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled) {
+        return;
+      }
+
+      const data = await updateTargetScanJob(jobId);
+
+      if (
+        !cancelled &&
+        data &&
+        !["COMPLETED", "FAILED"].includes(data.status)
+      ) {
+        window.setTimeout(poll, 3000);
+      }
+
+      if (
+        !cancelled &&
+        data &&
+        ["COMPLETED", "FAILED"].includes(data.status)
+      ) {
+        setRefreshKey((value) => value + 1);
+      }
+    };
+
+    const timer = window.setTimeout(poll, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [targetScan.jobId]);
+
+  const renderTargetScan = () => {
+    const status = targetScan.status || "IDLE";
+
+    const statusLabel = {
+      IDLE: "Ready",
+      PENDING: "Waiting for Kali scanner",
+      RUNNING: "Nmap scan running",
+      COMPLETED: "Scan completed",
+      FAILED: "Scan failed",
+    }[status] || status;
+
+    const statusClassName =
+      status === "COMPLETED"
+        ? "completed"
+        : status === "FAILED"
+          ? "failed"
+          : status === "RUNNING"
+            ? "running"
+            : "pending";
+
+    return (
+      <section className="dashboard-card page-card">
+        <div className="card-heading">
+          <div>
+            <span className="card-label">PHASE 14 · ACTIVE SCANNER</span>
+            <h2>Target Scan</h2>
+          </div>
+
+          <div className={`status-badge ${statusClassName}`}>
+            {statusLabel}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: "20px",
+            maxWidth: "760px",
+          }}
+        >
+          <div>
+            <label
+              htmlFor="target-scan-input"
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: 700,
+              }}
+            >
+              Authorized target IP
+            </label>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                id="target-scan-input"
+                type="text"
+                value={targetScan.target}
+                onChange={(event) =>
+                  setTargetScan((current) => ({
+                    ...current,
+                    target: event.target.value,
+                  }))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleStartTargetScan();
+                  }
+                }}
+                placeholder="192.168.57.101"
+                disabled={
+                  targetScanStarting ||
+                  ["PENDING", "RUNNING"].includes(targetScan.status)
+                }
+                style={{
+                  flex: "1 1 280px",
+                  minWidth: "240px",
+                  padding: "12px 14px",
+                  border: "1px solid rgba(148, 163, 184, 0.35)",
+                  borderRadius: "10px",
+                  background: "rgba(15, 23, 42, 0.65)",
+                  color: "inherit",
+                  fontSize: "15px",
+                }}
+              />
+
+              <button
+                type="button"
+                className="action-button"
+                onClick={handleStartTargetScan}
+                disabled={
+                  targetScanStarting ||
+                  ["PENDING", "RUNNING"].includes(targetScan.status)
+                }
+              >
+                {targetScanStarting
+                  ? "Starting..."
+                  : targetScan.status === "RUNNING"
+                    ? "Scanning..."
+                    : "Start Target Scan"}
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: "9px",
+                fontSize: "13px",
+                opacity: 0.72,
+              }}
+            >
+              Lab authorization: 192.168.57.0/24
+            </div>
+          </div>
+
+          {targetScanError && (
+            <div className="error-banner">
+              <strong>Target Scan Error</strong>
+              <span>{targetScanError}</span>
+            </div>
+          )}
+
+          {targetScan.jobId && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "12px",
+              }}
+            >
+              <div className="metric">
+                <span>Job ID</span>
+                <strong>#{targetScan.jobId}</strong>
+              </div>
+
+              <div className="metric">
+                <span>Target</span>
+                <strong>{targetScan.target || "N/A"}</strong>
+              </div>
+
+              <div className="metric">
+                <span>Status</span>
+                <strong>{statusLabel}</strong>
+              </div>
+
+              <div className="metric">
+                <span>Updated</span>
+                <strong>
+                  {targetScanLoading
+                    ? "Checking..."
+                    : formatDate(
+                        targetScan.completedAt ||
+                          targetScan.startedAt ||
+                          targetScan.createdAt
+                      )}
+                </strong>
+              </div>
+            </div>
+          )}
+
+          {targetScan.status === "COMPLETED" && (
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: "12px",
+                background: "rgba(34, 197, 94, 0.10)",
+                border: "1px solid rgba(34, 197, 94, 0.25)",
+              }}
+            >
+              <strong>Scan completed successfully.</strong>
+              <div style={{ marginTop: "6px", opacity: 0.8 }}>
+                Nmap results were imported into VulnWatch. Open the Scans,
+                Assets, or Services pages to review the updated data.
+              </div>
+            </div>
+          )}
+
+          {targetScan.status === "FAILED" && (
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: "12px",
+                background: "rgba(239, 68, 68, 0.10)",
+                border: "1px solid rgba(239, 68, 68, 0.25)",
+              }}
+            >
+              <strong>Scan failed.</strong>
+              <div style={{ marginTop: "6px", opacity: 0.8 }}>
+                {targetScan.errorMessage || "The scanner reported an error."}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    );
   };
 
   const loadInvestigation = async (correlationId) => {
@@ -1151,6 +1495,9 @@ function App() {
       case "scans":
         return renderScans();
 
+      case "target-scan":
+        return renderTargetScan();
+
       case "alerts":
         return renderAlerts();
 
@@ -1175,6 +1522,7 @@ function App() {
     vulnerabilities: "Vulnerabilities",
     findings: "Findings",
     scans: "Scans",
+    "target-scan": "Target Scan",
     alerts: "Alerts",
     correlations: "Correlations",
     investigations: "Investigations",
@@ -1242,6 +1590,13 @@ function App() {
             icon="◫"
             label="Scans"
             onClick={() => handleNavigation("scans")}
+          />
+
+          <NavButton
+            active={activePage === "target-scan"}
+            icon="⌁"
+            label="Target Scan"
+            onClick={() => handleNavigation("target-scan")}
           />
 
           <div className="nav-section">SOC</div>
