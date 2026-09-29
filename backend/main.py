@@ -9,8 +9,11 @@ from scan_import import router as scan_import_router
 from vulnerabilities import router as vulnerability_router
 from security_events import router as security_events_router
 from alerts import router as alerts_router
+from correlations import router as correlations_router
+
 
 logger = logging.getLogger("vulnwatch")
+
 
 app = FastAPI(
     title="VulnWatch API",
@@ -18,7 +21,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow the React frontend to communicate with the FastAPI backend.
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -27,122 +30,194 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ---------------------------------------------------------------------------
+# API Routers
+# ---------------------------------------------------------------------------
+
 app.include_router(scan_import_router)
 app.include_router(vulnerability_router)
 app.include_router(security_events_router)
 app.include_router(alerts_router)
+app.include_router(correlations_router)
 
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {
+        "status": "ok",
+        "service": "vulnwatch-backend",
+    }
 
 
 @app.get("/health/db")
 def health_db():
-    """Check whether the API can reach PostgreSQL."""
     try:
         if check_database():
-            return {"database": "connected"}
+            return {
+                "status": "ok",
+                "database": "connected",
+            }
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "unavailable",
+            },
+        )
+
     except Exception:
         logger.exception("Database health check failed")
 
-    return JSONResponse(
-        status_code=503,
-        content={"database": "unavailable"},
-    )
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "unavailable",
+            },
+        )
 
+
+# ---------------------------------------------------------------------------
+# Assets
+# ---------------------------------------------------------------------------
 
 @app.get("/api/v1/assets")
 def get_assets():
-    """Return discovered assets from PostgreSQL."""
+    query = """
+        SELECT
+            id,
+            ip_address::text,
+            hostname,
+            mac_address,
+            os_name,
+            first_seen,
+            last_seen
+        FROM assets
+        ORDER BY last_seen DESC NULLS LAST, id DESC;
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    id,
-                    ip_address::text,
-                    mac_address::text,
-                    hostname,
-                    os,
-                    os_accuracy,
-                    first_seen,
-                    last_seen
-                FROM assets
-                ORDER BY id;
-            """)
-
-            columns = [desc.name for desc in cur.description]
+            cur.execute(query)
             rows = cur.fetchall()
 
     return {
+        "count": len(rows),
         "assets": [
-            dict(zip(columns, row))
+            {
+                "id": row[0],
+                "ip_address": row[1],
+                "hostname": row[2],
+                "mac_address": row[3],
+                "os_name": row[4],
+                "first_seen": row[5],
+                "last_seen": row[6],
+            }
             for row in rows
-        ]
+        ],
     }
 
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
 
 @app.get("/api/v1/services")
 def get_services():
-    """Return discovered services with their target IP."""
+    query = """
+        SELECT
+            s.id,
+            s.asset_id,
+            a.ip_address::text AS target_ip,
+            a.hostname,
+            s.port,
+            s.protocol,
+            s.service_name,
+            s.product,
+            s.version,
+            s.state,
+            s.first_seen,
+            s.last_seen
+        FROM services s
+        JOIN assets a
+            ON a.id = s.asset_id
+        ORDER BY
+            a.ip_address,
+            s.port,
+            s.protocol;
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    s.id,
-                    s.asset_id,
-                    a.ip_address::text AS target_ip,
-                    s.port,
-                    s.protocol,
-                    s.service_name,
-                    s.product,
-                    s.version,
-                    s.cpe,
-                    s.state,
-                    s.first_seen,
-                    s.last_seen,
-                    s.last_scan_id
-                FROM services s
-                JOIN assets a
-                    ON a.id = s.asset_id
-                ORDER BY s.asset_id, s.port;
-            """)
-
-            columns = [desc.name for desc in cur.description]
+            cur.execute(query)
             rows = cur.fetchall()
 
     return {
+        "count": len(rows),
         "services": [
-            dict(zip(columns, row))
+            {
+                "id": row[0],
+                "asset_id": row[1],
+                "target_ip": row[2],
+                "hostname": row[3],
+                "port": row[4],
+                "protocol": row[5],
+                "service_name": row[6],
+                "product": row[7],
+                "version": row[8],
+                "state": row[9],
+                "first_seen": row[10],
+                "last_seen": row[11],
+            }
             for row in rows
-        ]
+        ],
     }
 
 
+# ---------------------------------------------------------------------------
+# Scans
+# ---------------------------------------------------------------------------
+
 @app.get("/api/v1/scans")
 def get_scans():
-    """Return recorded Nmap scans from PostgreSQL."""
+    query = """
+        SELECT
+            id,
+            asset_id,
+            scanner_ip::text,
+            scan_type,
+            started_at,
+            completed_at,
+            status,
+            source_file
+        FROM scans
+        ORDER BY started_at DESC NULLS LAST, id DESC;
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    id,
-                    started_at,
-                    target::text,
-                    nmap_command,
-                    scanner_ip::text,
-                    created_at
-                FROM scans
-                ORDER BY started_at DESC;
-            """)
-
-            columns = [desc.name for desc in cur.description]
+            cur.execute(query)
             rows = cur.fetchall()
 
     return {
+        "count": len(rows),
         "scans": [
-            dict(zip(columns, row))
+            {
+                "id": row[0],
+                "asset_id": row[1],
+                "scanner_ip": row[2],
+                "scan_type": row[3],
+                "started_at": row[4],
+                "completed_at": row[5],
+                "status": row[6],
+                "source_file": row[7],
+            }
             for row in rows
-        ]
+        ],
     }
