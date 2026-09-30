@@ -28,6 +28,7 @@ logger = logging.getLogger("vulnwatch")
 router = APIRouter(
     prefix="/api/v1",
     tags=["vulnerabilities"],
+    dependencies=[Depends(require_api_key)],
 )
 
 

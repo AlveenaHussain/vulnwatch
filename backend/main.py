@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import check_database, get_connection
-from security import require_api_key
 from scan_import import router as scan_import_router
 from vulnerabilities import router as vulnerabilities_router
 from security_events import router as security_events_router
@@ -12,6 +11,32 @@ from alerts import router as alerts_router
 from correlations import router as correlations_router
 from investigations import router as investigations_router
 from target_scan import router as target_scan_router
+from reporting import router as reporting_router
+
+
+def get_allowed_origins() -> list[str]:
+    """
+    Read allowed frontend origins from the environment.
+
+    Default:
+        http://localhost:5173
+        http://127.0.0.1:5173
+
+    Example:
+        VULNWATCH_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+    """
+    raw_origins = os.getenv(
+        "VULNWATCH_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    )
+
+    origins = [
+        origin.strip()
+        for origin in raw_origins.split(",")
+        if origin.strip()
+    ]
+
+    return origins
 
 
 app = FastAPI(
@@ -23,13 +48,20 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=[
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS",
+    ],
+    allow_headers=[
+        "Content-Type",
+        "X-API-Key",
+    ],
 )
 
 
@@ -40,6 +72,7 @@ app.include_router(alerts_router)
 app.include_router(correlations_router)
 app.include_router(investigations_router)
 app.include_router(target_scan_router)
+app.include_router(reporting_router)
 
 
 @app.get("/health", tags=["health"])
@@ -64,11 +97,10 @@ def database_health():
             "database": "unavailable",
         }
 
-    except Exception as exc:
+    except Exception:
         return {
             "status": "error",
             "database": "unavailable",
-            "detail": str(exc),
         }
 
 

@@ -1,9 +1,10 @@
 """
-API key protection for VulnWatch write (ingestion) endpoints.
+API key protection for VulnWatch protected API endpoints.
 
 The expected key comes from the VULNWATCH_API_KEY environment variable
 (stored in .env, passed to the backend container by Docker Compose).
-It is never hard-coded in source code.
+
+The API key is never hard-coded in source code.
 """
 
 import logging
@@ -13,29 +14,47 @@ import secrets
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
+
 logger = logging.getLogger("vulnwatch")
 
-# auto_error=False -> we decide the response ourselves (401), and Swagger
-# still shows an "Authorize" button for the X-API-Key header.
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# auto_error=False -> we decide the response ourselves.
+# Swagger still exposes the X-API-Key header through the Authorize button.
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    auto_error=False,
+)
 
 
-def require_api_key(provided_key: str | None = Security(api_key_header)) -> None:
-    """Allow the request only if X-API-Key matches VULNWATCH_API_KEY."""
+def require_api_key(
+    provided_key: str | None = Security(api_key_header),
+) -> None:
+    """
+    Allow the request only when X-API-Key matches
+    the VULNWATCH_API_KEY environment variable.
+    """
+
     expected_key = os.getenv("VULNWATCH_API_KEY")
 
+    # Fail closed:
+    # if the backend has no configured API key, protected
+    # endpoints must not accept requests.
     if not expected_key:
-        # Fail closed: a server without a configured key accepts nothing.
-        logger.error("VULNWATCH_API_KEY is not set; ingestion endpoints are disabled")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Ingestion is not configured",
+        logger.error(
+            "VULNWATCH_API_KEY is not set; "
+            "protected API endpoints are disabled"
         )
 
-    # compare_digest takes the same time whether the first or last character
-    # is wrong, so an attacker cannot guess the key by measuring response time.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API authentication is not configured",
+        )
+
+    # Constant-time comparison prevents timing-based
+    # comparison attacks.
     if not provided_key or not secrets.compare_digest(
-        provided_key.encode("utf-8"), expected_key.encode("utf-8")
+        provided_key.encode("utf-8"),
+        expected_key.encode("utf-8"),
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

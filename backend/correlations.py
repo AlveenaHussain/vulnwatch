@@ -26,6 +26,7 @@ logger = logging.getLogger("vulnwatch")
 router = APIRouter(
     prefix="/api/v1/correlations",
     tags=["Correlations"],
+    dependencies=[Security(require_api_key)],
 )
 
 
@@ -71,7 +72,6 @@ VALID_PRIORITIES = {
 )
 def import_correlation(
     correlation: CorrelationCreate,
-    _: None = Security(require_api_key),
 ):
     """
     Create a correlation between a vulnerability/finding

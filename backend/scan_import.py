@@ -13,16 +13,27 @@ from typing import Literal
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, IPvAnyAddress
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    IPvAnyAddress,
+    IPvAnyNetwork,
+)
 
 from database import get_connection
 from security import require_api_key
 
 logger = logging.getLogger("vulnwatch")
 
-router = APIRouter(prefix="/api/v1", tags=["ingestion"])
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["ingestion"],
+)
 
 MAC_PATTERN = r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+SAFE_TEXT_PATTERN = r"^[^\x00-\x1f\x7f]*$"
 
 NmapState = Literal[
     "open",
@@ -45,13 +56,27 @@ class StrictModel(BaseModel):
 
 class ScanInfo(StrictModel):
     started_at: AwareDatetime
-    target: str = Field(min_length=1, max_length=255)
-    nmap_command: str = Field(min_length=1, max_length=2000)
+
+    target: str = Field(
+        min_length=1,
+        max_length=255,
+        pattern=SAFE_TEXT_PATTERN,
+    )
+
+    nmap_command: str = Field(
+        min_length=1,
+        max_length=2000,
+        pattern=SAFE_TEXT_PATTERN,
+    )
+
     scanner_ip: IPvAnyAddress
 
 
 class ServiceIn(StrictModel):
-    port: int = Field(ge=1, le=65535)
+    port: int = Field(
+        ge=1,
+        le=65535,
+    )
 
     protocol: Literal["tcp", "udp"]
 
@@ -60,21 +85,25 @@ class ServiceIn(StrictModel):
     service_name: str | None = Field(
         default=None,
         max_length=100,
+        pattern=SAFE_TEXT_PATTERN,
     )
 
     product: str | None = Field(
         default=None,
         max_length=255,
+        pattern=SAFE_TEXT_PATTERN,
     )
 
     version: str | None = Field(
         default=None,
         max_length=255,
+        pattern=SAFE_TEXT_PATTERN,
     )
 
     cpe: str | None = Field(
         default=None,
         max_length=500,
+        pattern=SAFE_TEXT_PATTERN,
     )
 
 
@@ -89,11 +118,13 @@ class HostIn(StrictModel):
     hostname: str | None = Field(
         default=None,
         max_length=255,
+        pattern=SAFE_TEXT_PATTERN,
     )
 
     os: str | None = Field(
         default=None,
         max_length=255,
+        pattern=SAFE_TEXT_PATTERN,
     )
 
     os_accuracy: int | None = Field(
@@ -104,7 +135,7 @@ class HostIn(StrictModel):
 
     services: list[ServiceIn] = Field(
         default_factory=list,
-        max_length=10000,
+        max_length=2000,
     )
 
 
@@ -113,7 +144,7 @@ class ScanImportRequest(StrictModel):
 
     hosts: list[HostIn] = Field(
         min_length=1,
-        max_length=1024,
+        max_length=256,
     )
 
 

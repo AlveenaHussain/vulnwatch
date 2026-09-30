@@ -9,13 +9,17 @@ Phase 13:
 - Include vulnerability
 - Include finding
 - Include security events as timeline/evidence
+
+Phase 15:
+- Protect investigation data with API key authentication
 """
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Security
 
 from database import get_connection
+from security import require_api_key
 
 
 logger = logging.getLogger("vulnwatch")
@@ -27,8 +31,13 @@ router = APIRouter(
 )
 
 
-@router.get("/{correlation_id}")
-def get_investigation(correlation_id: int):
+@router.get(
+    "/{correlation_id}",
+)
+def get_investigation(
+    correlation_id: int,
+    _: None = Security(require_api_key),
+):
     """
     Return a complete investigation view for one correlation.
 

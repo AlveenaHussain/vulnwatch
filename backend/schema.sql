@@ -57,7 +57,17 @@ CREATE TABLE services (
     cpe TEXT,
 
     state TEXT NOT NULL DEFAULT 'open'
-        CHECK (state IN ('open', 'closed', 'filtered', 'unknown')),
+        CHECK (
+            state IN (
+                'open',
+                'closed',
+                'filtered',
+                'unfiltered',
+                'open|filtered',
+                'closed|filtered',
+                'unknown'
+            )
+        ),
 
     first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),

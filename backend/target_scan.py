@@ -437,6 +437,7 @@ def parse_nmap_xml(
 )
 def start_target_scan(
     payload: TargetScanStartRequest,
+    _: None = Security(require_api_key),
 ):
 
     target_input, target_ip = resolve_authorized_target(
@@ -514,6 +515,7 @@ def start_target_scan(
 )
 def get_target_scan_job(
     job_id: int,
+    _: None = Security(require_api_key),
 ):
 
     with get_connection() as connection:

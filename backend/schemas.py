@@ -3,6 +3,20 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class StrictModel(BaseModel):
+    """
+    Base model for API input validation.
+
+    Unknown fields are rejected instead of silently ignored,
+    and surrounding whitespace is removed from string values.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+
 class AssetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,28 +59,78 @@ class ScanResponse(BaseModel):
     created_at: datetime
 
 
-class VulnerabilityImportItem(BaseModel):
-    cve_id: str = Field(min_length=1, max_length=64)
-    description: str | None = None
-    cvss_version: str | None = None
-    cvss_score: float | None = Field(default=None, ge=0.0, le=10.0)
-    cvss_vector: str | None = None
-    cwe: str | None = None
+class VulnerabilityImportItem(StrictModel):
+    cve_id: str = Field(
+        min_length=1,
+        max_length=64,
+    )
+
+    description: str | None = Field(
+        default=None,
+        max_length=10000,
+    )
+
+    cvss_version: str | None = Field(
+        default=None,
+        max_length=32,
+    )
+
+    cvss_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=10.0,
+    )
+
+    cvss_vector: str | None = Field(
+        default=None,
+        max_length=512,
+    )
+
+    cwe: str | None = Field(
+        default=None,
+        max_length=64,
+    )
+
     published: datetime | None = None
+
     last_modified: datetime | None = None
 
 
-class VulnerabilityFinding(BaseModel):
-    target_ip: str
-    port: int = Field(ge=1, le=65535)
-    protocol: str
-    matched_cpe: str
-    vulnerabilities: list[VulnerabilityImportItem]
+class VulnerabilityFinding(StrictModel):
+    target_ip: str = Field(
+        min_length=1,
+        max_length=64,
+    )
+
+    port: int = Field(
+        ge=1,
+        le=65535,
+    )
+
+    protocol: str = Field(
+        min_length=1,
+        max_length=16,
+    )
+
+    matched_cpe: str = Field(
+        min_length=1,
+        max_length=512,
+    )
+
+    vulnerabilities: list[VulnerabilityImportItem] = Field(
+        max_length=1000,
+    )
 
 
-class VulnerabilityImportRequest(BaseModel):
-    source: str
-    findings: list[VulnerabilityFinding]
+class VulnerabilityImportRequest(StrictModel):
+    source: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    findings: list[VulnerabilityFinding] = Field(
+        max_length=5000,
+    )
 
 
 class VulnerabilityImportResponse(BaseModel):

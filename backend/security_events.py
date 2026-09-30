@@ -25,6 +25,7 @@ logger = logging.getLogger("vulnwatch")
 router = APIRouter(
     prefix="/api/v1/security-events",
     tags=["Security Events"],
+    dependencies=[Security(require_api_key)],
 )
 
 
@@ -46,7 +47,6 @@ class SecurityEventCreate(BaseModel):
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 def import_security_event(
     event: SecurityEventCreate,
-    _: None = Security(require_api_key),
 ):
     allowed_severities = {
         "CRITICAL",
