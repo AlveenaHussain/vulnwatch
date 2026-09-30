@@ -2,6 +2,461 @@ import { useEffect, useState } from "react";
 import "./App.css";
 
 const API_BASE_URL = "http://localhost:8000";
+const API_KEY = import.meta.env.VITE_VULNWATCH_API_KEY;
+
+const apiFetch = async (endpoint, options = {}) => {
+  if (!API_KEY) {
+    throw new Error(
+      "VITE_VULNWATCH_API_KEY is missing. Check frontend/.env and restart Vite."
+    );
+  }
+
+  const headers = {
+    ...(options.headers || {}),
+    "X-API-Key": API_KEY,
+  };
+
+  return fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+};
+
+/*
+ * UI-only styling.
+ * No API, state, scan, polling, navigation or business logic is changed.
+ */
+const UI_STYLES = `
+  :root {
+    --vw-content-gap: 28px;
+    --vw-card-radius: 16px;
+    --vw-card-padding: 24px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    flex-shrink: 0;
+  }
+
+  .main-area {
+    min-width: 0;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .dashboard-content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 32px 36px 48px;
+    overflow-x: hidden;
+  }
+
+  .hero-section {
+    margin-bottom: 28px;
+    min-width: 0;
+  }
+
+  .stats-grid,
+  .analytics-grid {
+    min-width: 0;
+  }
+
+  .dashboard-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--vw-card-radius);
+    overflow: hidden;
+  }
+
+  .page-card {
+    margin-bottom: 24px;
+  }
+
+  .card-heading {
+    min-width: 0;
+    gap: 20px;
+  }
+
+  .card-heading > div:first-child {
+    min-width: 0;
+  }
+
+  .card-heading h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .target-scan-layout {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .target-scan-input-row {
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .target-scan-input-row input {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .target-scan-input-row .action-button {
+    flex: 0 0 auto;
+  }
+
+  .target-scan-network-badge {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .target-scan-job-grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .target-scan-job-grid .metric {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .target-scan-job-grid .metric span,
+  .target-scan-job-grid .metric strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .target-scan-processing {
+    width: 100%;
+    min-width: 0;
+    margin-top: 4px;
+    padding: 24px 26px !important;
+    border-radius: 16px !important;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .target-scan-processing::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #38bdf8, #6366f1);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .target-scan-processing-title {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.3;
+  }
+
+  .target-scan-progress-track {
+    width: 100%;
+    min-width: 0;
+    height: 9px !important;
+    margin: 4px 0 14px !important;
+    border-radius: 999px !important;
+    overflow: hidden;
+  }
+
+  .target-scan-progress-fill {
+    height: 100%;
+    min-width: 0;
+    border-radius: 999px !important;
+  }
+
+  .target-scan-processing-footer {
+    width: 100%;
+    min-width: 0;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .target-scan-processing-footer > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .target-scan-processing-message {
+    margin-top: 14px !important;
+    max-width: 850px;
+    line-height: 1.55 !important;
+  }
+
+  .table-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+  }
+
+  .table-container table {
+    min-width: 680px;
+    width: 100%;
+  }
+
+  .table-container th,
+  .table-container td {
+    white-space: nowrap;
+  }
+
+  .finding-name,
+  .finding-sub,
+  .cve-code {
+    overflow-wrap: anywhere;
+  }
+
+  .investigation-card {
+    min-width: 0;
+  }
+
+  .investigation-card-main {
+    min-width: 0;
+    gap: 18px;
+  }
+
+  .investigation-card-main > div {
+    min-width: 0;
+  }
+
+  .investigation-card-main h3,
+  .investigation-card-main p {
+    overflow-wrap: anywhere;
+  }
+
+  .investigation-hero {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .investigation-hero > div {
+    min-width: 0;
+  }
+
+  .investigation-hero h1,
+  .investigation-hero p {
+    overflow-wrap: anywhere;
+  }
+
+  .detail-list {
+    min-width: 0;
+  }
+
+  .detail-row {
+    min-width: 0;
+    gap: 20px;
+  }
+
+  .detail-row span,
+  .detail-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .evidence-code {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .timeline-content {
+    min-width: 0;
+  }
+
+  .timeline-meta {
+    overflow-wrap: anywhere;
+  }
+
+  .topbar {
+    min-width: 0;
+  }
+
+  .breadcrumb {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .topbar-right {
+    min-width: 0;
+  }
+
+  .last-scan {
+    min-width: 0;
+  }
+
+  .refresh-button,
+  .backend-status,
+  .user-avatar {
+    flex-shrink: 0;
+  }
+
+  .error-banner {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    margin-bottom: 24px;
+  }
+
+  .action-button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .metric {
+    min-width: 0;
+  }
+
+  .metric span,
+  .metric strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .target-scan-completed,
+  .target-scan-failed {
+    margin-top: 2px;
+    width: 100%;
+  }
+
+  .target-scan-completed {
+    border-radius: 14px !important;
+  }
+
+  .target-scan-failed {
+    border-radius: 14px !important;
+  }
+
+  @media (min-width: 1100px) {
+    .dashboard-content {
+      padding-left: 40px;
+      padding-right: 40px;
+    }
+  }
+
+  @media (max-width: 1100px) {
+    .dashboard-content {
+      padding: 28px 24px 40px;
+    }
+
+    .topbar-right {
+      gap: 10px;
+    }
+
+    .last-scan {
+      display: none;
+    }
+  }
+
+  @media (max-width: 800px) {
+    .dashboard-content {
+      padding: 24px 18px 36px;
+    }
+
+    .card-heading {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .target-scan-input-row {
+      flex-direction: column;
+    }
+
+    .target-scan-input-row input,
+    .target-scan-input-row .action-button {
+      width: 100%;
+      min-width: 0 !important;
+      flex: 1 1 auto;
+    }
+
+    .target-scan-processing {
+      padding: 22px 20px !important;
+    }
+
+    .target-scan-processing-title {
+      font-size: 20px !important;
+    }
+
+    .detail-row {
+      flex-direction: column;
+      align-items: flex-start !important;
+      gap: 5px !important;
+    }
+
+    .investigation-card-main {
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+
+    .investigation-card .action-button {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .dashboard-content {
+      padding: 20px 14px 30px;
+    }
+
+    .page-card {
+      margin-bottom: 20px;
+    }
+
+    .topbar-right {
+      gap: 8px;
+    }
+
+    .backend-status {
+      display: none;
+    }
+
+    .refresh-button {
+      font-size: 12px;
+    }
+
+    .target-scan-processing {
+      padding: 20px 16px !important;
+    }
+
+    .target-scan-processing-footer {
+      align-items: flex-start !important;
+      flex-direction: column;
+    }
+  }
+`;
 
 function App() {
   const [activePage, setActivePage] = useState("dashboard");
@@ -65,57 +520,31 @@ function App() {
     status?.toLowerCase().replaceAll("_", "-") || "unknown";
 
   const formatDate = (value) => {
-    if (!value) {
-      return "N/A";
-    }
-
+    if (!value) return "N/A";
     const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return String(value);
-    }
-
+    if (Number.isNaN(date.getTime())) return String(value);
     return date.toLocaleString();
   };
 
   const normalizeList = (data, key) => {
-    if (Array.isArray(data)) {
-      return data;
-    }
-
-    if (Array.isArray(data?.[key])) {
-      return data[key];
-    }
-
-    if (Array.isArray(data?.items)) {
-      return data.items;
-    }
-
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.[key])) return data[key];
+    if (Array.isArray(data?.items)) return data.items;
     return [];
   };
 
   const normalizeIp = (value) => {
-    if (!value) {
-      return "";
-    }
-
-    return String(value)
-      .replace("/32", "")
-      .trim();
+    if (!value) return "";
+    return String(value).replace("/32", "").trim();
   };
 
-  const matchesTarget = (value, target) => {
-    return normalizeIp(value) === normalizeIp(target);
-  };
+  const matchesTarget = (value, target) =>
+    normalizeIp(value) === normalizeIp(target);
 
   const safeFetchJson = async (endpoint) => {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`);
-
-      if (!response.ok) {
-        return null;
-      }
-
+      const response = await apiFetch(endpoint);
+      if (!response.ok) return null;
       return await response.json();
     } catch (err) {
       console.error(`Optional API failed: ${endpoint}`, err);
@@ -146,14 +575,8 @@ function App() {
 
         const entries = await Promise.all(
           Object.entries(endpoints).map(async ([name, endpoint]) => {
-            const response = await fetch(
-              `${API_BASE_URL}${endpoint}`
-            );
-
-            if (!response.ok) {
-              throw new Error(`${name} API request failed`);
-            }
-
+            const response = await apiFetch(endpoint);
+            if (!response.ok) throw new Error(`${name} API request failed`);
             return [name, await response.json()];
           })
         );
@@ -163,49 +586,20 @@ function App() {
         setSummary(data.summary);
         setRiskOverview(data.risk);
         setRecentFindings(data.recent?.findings || []);
-        setSeverityDistribution(
-          data.severity?.distribution || []
-        );
-        setStatusDistribution(
-          data.status?.distribution || []
-        );
-
+        setSeverityDistribution(data.severity?.distribution || []);
+        setStatusDistribution(data.status?.distribution || []);
         setAssets(normalizeList(data.assets, "assets"));
         setServices(normalizeList(data.services, "services"));
-
-        setVulnerabilities(
-          normalizeList(
-            data.vulnerabilities,
-            "vulnerabilities"
-          )
-        );
-
-        setFindings(
-          normalizeList(data.findings, "findings")
-        );
-
-        setScans(
-          normalizeList(data.scans, "scans")
-        );
-
-        setAlerts(
-          normalizeList(data.alerts, "alerts")
-        );
-
-        setCorrelations(
-          normalizeList(data.correlations, "correlations")
-        );
-
-        setSecurityEvents(
-          normalizeList(data.events, "events")
-        );
-
+        setVulnerabilities(normalizeList(data.vulnerabilities, "vulnerabilities"));
+        setFindings(normalizeList(data.findings, "findings"));
+        setScans(normalizeList(data.scans, "scans"));
+        setAlerts(normalizeList(data.alerts, "alerts"));
+        setCorrelations(normalizeList(data.correlations, "correlations"));
+        setSecurityEvents(normalizeList(data.events, "events"));
         setError("");
       } catch (err) {
         console.error(err);
-        setError(
-          "Unable to connect to VulnWatch backend."
-        );
+        setError("Unable to connect to VulnWatch backend.");
       } finally {
         setLoading(false);
       }
@@ -217,18 +611,12 @@ function App() {
   const handleRefresh = () => {
     setRefreshing(true);
     setRefreshKey((value) => value + 1);
-
-    window.setTimeout(() => {
-      setRefreshing(false);
-    }, 700);
+    window.setTimeout(() => setRefreshing(false), 700);
   };
 
   const loadTargetScanResults = async (target) => {
     const normalizedTarget = normalizeIp(target);
-
-    if (!normalizedTarget) {
-      return;
-    }
+    if (!normalizedTarget) return;
 
     setTargetScanResults((current) => ({
       ...current,
@@ -239,26 +627,14 @@ function App() {
 
     try {
       let asset =
-        assets.find((item) =>
-          matchesTarget(item.ip_address, normalizedTarget)
-        ) || null;
+        assets.find((item) => matchesTarget(item.ip_address, normalizedTarget)) || null;
 
       if (!asset) {
-        const freshAssets = await safeFetchJson(
-          "/api/v1/assets"
-        );
-
-        const assetList = normalizeList(
-          freshAssets,
-          "assets"
-        );
-
+        const freshAssets = await safeFetchJson("/api/v1/assets");
+        const assetList = normalizeList(freshAssets, "assets");
         asset =
-          assetList.find((item) =>
-            matchesTarget(
-              item.ip_address,
-              normalizedTarget
-            )
+          assetList.find(
+            (item) => matchesTarget(item.ip_address, normalizedTarget)
           ) || null;
       }
 
@@ -279,21 +655,12 @@ function App() {
         const serviceResponse = await safeFetchJson(
           `/api/v1/services?asset_id=${asset.id}`
         );
+        const serviceList = normalizeList(serviceResponse, "services");
+        if (serviceList.length > 0) targetServices = serviceList;
 
-        const serviceList = normalizeList(
-          serviceResponse,
-          "services"
+        const vulnerabilityResponse = await safeFetchJson(
+          `/api/v1/assets/${asset.id}/vulnerabilities`
         );
-
-        if (serviceList.length > 0) {
-          targetServices = serviceList;
-        }
-
-        const vulnerabilityResponse =
-          await safeFetchJson(
-            `/api/v1/assets/${asset.id}/vulnerabilities`
-          );
-
         targetVulnerabilities = normalizeList(
           vulnerabilityResponse,
           "vulnerabilities"
@@ -302,28 +669,18 @@ function App() {
         const findingResponse = await safeFetchJson(
           `/api/v1/findings?asset_id=${asset.id}`
         );
-
-        targetFindings = normalizeList(
-          findingResponse,
-          "findings"
-        );
+        targetFindings = normalizeList(findingResponse, "findings");
 
         const alertResponse = await safeFetchJson(
           `/api/v1/alerts?destination_ip=${encodeURIComponent(
             normalizedTarget
           )}`
         );
+        targetAlerts = normalizeList(alertResponse, "alerts");
 
-        targetAlerts = normalizeList(
-          alertResponse,
-          "alerts"
+        const correlationResponse = await safeFetchJson(
+          `/api/v1/correlations?asset_id=${asset.id}`
         );
-
-        const correlationResponse =
-          await safeFetchJson(
-            `/api/v1/correlations?asset_id=${asset.id}`
-          );
-
         targetCorrelations = normalizeList(
           correlationResponse,
           "correlations"
@@ -332,11 +689,7 @@ function App() {
         const scanResponse = await safeFetchJson(
           `/api/v1/scans?asset_id=${asset.id}`
         );
-
-        targetScans = normalizeList(
-          scanResponse,
-          "scans"
-        );
+        targetScans = normalizeList(scanResponse, "scans");
       }
 
       if (targetServices.length === 0) {
@@ -348,67 +701,46 @@ function App() {
         );
       }
 
-      if (targetVulnerabilities.length === 0) {
-        if (asset?.id) {
-          targetVulnerabilities =
-            vulnerabilities.filter(
-              (item) =>
-                Number(item.asset_id) === Number(asset.id) ||
-                Number(item.service_asset_id) ===
-                  Number(asset.id)
-            );
-        }
+      if (targetVulnerabilities.length === 0 && asset?.id) {
+        targetVulnerabilities = vulnerabilities.filter(
+          (item) =>
+            Number(item.asset_id) === Number(asset.id) ||
+            Number(item.service_asset_id) === Number(asset.id)
+        );
       }
 
       if (targetFindings.length === 0) {
         targetFindings = findings.filter(
           (item) =>
             matchesTarget(
-              item.target_ip ||
-                item.ip_address ||
-                item.asset_ip,
+              item.target_ip || item.ip_address || item.asset_ip,
               normalizedTarget
             ) ||
-            (asset?.id &&
-              Number(item.asset_id) === Number(asset.id))
+            (asset?.id && Number(item.asset_id) === Number(asset.id))
         );
       }
 
       if (targetAlerts.length === 0) {
         targetAlerts = alerts.filter(
           (item) =>
-            matchesTarget(
-              item.destination_ip,
-              normalizedTarget
-            ) ||
-            matchesTarget(
-              item.target_ip,
-              normalizedTarget
-            )
+            matchesTarget(item.destination_ip, normalizedTarget) ||
+            matchesTarget(item.target_ip, normalizedTarget)
         );
       }
 
       if (targetCorrelations.length === 0) {
         targetCorrelations = correlations.filter(
           (item) =>
-            matchesTarget(
-              item.target_ip,
-              normalizedTarget
-            ) ||
-            (asset?.id &&
-              Number(item.asset_id) === Number(asset.id))
+            matchesTarget(item.target_ip, normalizedTarget) ||
+            (asset?.id && Number(item.asset_id) === Number(asset.id))
         );
       }
 
       if (targetScans.length === 0) {
         targetScans = scans.filter(
           (item) =>
-            matchesTarget(
-              item.target_ip,
-              normalizedTarget
-            ) ||
-            (asset?.id &&
-              Number(item.asset_id) === Number(asset.id))
+            matchesTarget(item.target_ip, normalizedTarget) ||
+            (asset?.id && Number(item.asset_id) === Number(asset.id))
         );
       }
 
@@ -426,12 +758,10 @@ function App() {
       });
     } catch (err) {
       console.error(err);
-
       setTargetScanResults((current) => ({
         ...current,
         loading: false,
-        error:
-          "Scan completed, but target result data could not be loaded.",
+        error: "Scan completed, but target result data could not be loaded.",
       }));
     }
   };
@@ -439,21 +769,14 @@ function App() {
   const updateTargetScanJob = async (jobId) => {
     try {
       setTargetScanLoading(true);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/target-scan/jobs/${jobId}`
+      const response = await apiFetch(
+        `/api/v1/target-scan/jobs/${jobId}`
       );
-
-      if (!response.ok) {
-        throw new Error(
-          "Target scan status request failed"
-        );
-      }
+      if (!response.ok)
+        throw new Error("Target scan status request failed");
 
       const data = await response.json();
-
-      const target =
-        data.target_input || targetScan.target;
+      const target = data.target_input || targetScan.target;
 
       setTargetScan((current) => ({
         ...current,
@@ -475,11 +798,7 @@ function App() {
       return data;
     } catch (err) {
       console.error(err);
-
-      setTargetScanError(
-        "Unable to read target scan status."
-      );
-
+      setTargetScanError("Unable to read target scan status.");
       return null;
     } finally {
       setTargetScanLoading(false);
@@ -490,9 +809,7 @@ function App() {
     const target = targetScan.target.trim();
 
     if (!target) {
-      setTargetScanError(
-        "Enter a target IP address first."
-      );
+      setTargetScanError("Enter a target IP address first.");
       return;
     }
 
@@ -513,23 +830,17 @@ function App() {
     });
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/target-scan/start`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ target }),
-        }
-      );
+      const response = await apiFetch("/api/v1/target-scan/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.detail ||
-            "Unable to create target scan job."
+          data?.detail || "Unable to create target scan job."
         );
       }
 
@@ -545,16 +856,12 @@ function App() {
       }));
 
       setActivePage("target-scan");
-
       await updateTargetScanJob(data.job_id);
-
       setRefreshKey((value) => value + 1);
     } catch (err) {
       console.error(err);
-
       setTargetScanError(
-        err.message ||
-          "Unable to start target scan."
+        err.message || "Unable to start target scan."
       );
     } finally {
       setTargetScanStarting(false);
@@ -564,26 +871,19 @@ function App() {
   useEffect(() => {
     const jobId = targetScan.jobId;
 
-    if (!jobId) {
-      return undefined;
-    }
+    if (!jobId) return undefined;
 
     let cancelled = false;
 
     const poll = async () => {
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
 
-      const data =
-        await updateTargetScanJob(jobId);
+      const data = await updateTargetScanJob(jobId);
 
       if (
         !cancelled &&
         data &&
-        !["COMPLETED", "FAILED"].includes(
-          data.status
-        )
+        !["COMPLETED", "FAILED"].includes(data.status)
       ) {
         window.setTimeout(poll, 3000);
       }
@@ -591,18 +891,13 @@ function App() {
       if (
         !cancelled &&
         data &&
-        ["COMPLETED", "FAILED"].includes(
-          data.status
-        )
+        ["COMPLETED", "FAILED"].includes(data.status)
       ) {
         setRefreshKey((value) => value + 1);
       }
     };
 
-    const timer = window.setTimeout(
-      poll,
-      3000
-    );
+    const timer = window.setTimeout(poll, 3000);
 
     return () => {
       cancelled = true;
@@ -611,67 +906,57 @@ function App() {
   }, [targetScan.jobId]);
 
   const renderTargetScanLauncher = () => {
-    const scanRunning = [
-      "PENDING",
-      "RUNNING",
-    ].includes(targetScan.status);
+    const scanRunning = ["PENDING", "RUNNING"].includes(
+      targetScan.status
+    );
 
-    const launcherStatus =
-      scanRunning
-        ? "Processing"
-        : targetScan.status === "COMPLETED"
-          ? "Completed"
-          : targetScan.status === "FAILED"
-            ? "Failed"
-            : "Ready";
+    const launcherStatus = scanRunning
+      ? "Processing"
+      : targetScan.status === "COMPLETED"
+        ? "Completed"
+        : targetScan.status === "FAILED"
+          ? "Failed"
+          : "Ready";
 
-    const launcherStatusClass =
-      scanRunning
-        ? "running"
-        : targetScan.status === "COMPLETED"
-          ? "completed"
-          : targetScan.status === "FAILED"
-            ? "failed"
-            : "pending";
+    const launcherStatusClass = scanRunning
+      ? "running"
+      : targetScan.status === "COMPLETED"
+        ? "completed"
+        : targetScan.status === "FAILED"
+          ? "failed"
+          : "pending";
 
     return (
       <section className="dashboard-card page-card">
         <div className="card-heading">
           <div>
-            <div className="card-label">
-              TARGET SCAN
-            </div>
-
+            <div className="card-label">TARGET SCAN</div>
             <h2>Run Target Scan</h2>
           </div>
-
-          <div
-            className={`status-badge ${launcherStatusClass}`}
-          >
+          <div className={`status-badge ${launcherStatusClass}`}>
             {launcherStatus}
           </div>
         </div>
 
         <div
-          style={{
-            display: "grid",
-            gap: "14px",
-          }}
+          className="target-scan-layout"
+          style={{ display: "grid", gap: "18px" }}
         >
           <div
             style={{
               fontSize: "14px",
               opacity: 0.8,
+              lineHeight: "1.6",
             }}
           >
-            Enter an authorized lab IP and start an
-            Nmap scan.
+            Enter an authorized lab IP and start an Nmap scan.
           </div>
 
           <div
+            className="target-scan-input-row"
             style={{
               display: "flex",
-              gap: "10px",
+              gap: "12px",
               flexWrap: "wrap",
             }}
           >
@@ -685,27 +970,21 @@ function App() {
                 }))
               }
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleStartTargetScan();
-                }
+                if (event.key === "Enter") handleStartTargetScan();
               }}
               placeholder="e.g. 192.168.57.101"
               aria-label="Authorized target IP"
-              disabled={
-                targetScanStarting ||
-                scanRunning
-              }
+              disabled={targetScanStarting || scanRunning}
               style={{
                 flex: "1 1 300px",
                 minWidth: "260px",
-                padding: "12px 14px",
-                border:
-                  "1px solid rgba(148, 163, 184, 0.35)",
+                padding: "13px 15px",
+                border: "1px solid rgba(148, 163, 184, 0.35)",
                 borderRadius: "10px",
-                background:
-                  "rgba(15, 23, 42, 0.65)",
+                background: "rgba(15, 23, 42, 0.65)",
                 color: "inherit",
                 fontSize: "15px",
+                outline: "none",
               }}
             />
 
@@ -713,15 +992,11 @@ function App() {
               type="button"
               className="action-button"
               onClick={handleStartTargetScan}
-              disabled={
-                targetScanStarting ||
-                scanRunning
-              }
+              disabled={targetScanStarting || scanRunning}
               style={{
                 minWidth: "170px",
                 cursor:
-                  targetScanStarting ||
-                  scanRunning
+                  targetScanStarting || scanRunning
                     ? "not-allowed"
                     : "pointer",
               }}
@@ -735,11 +1010,13 @@ function App() {
           </div>
 
           <div
+            className="target-scan-network-badge"
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: "8px",
               width: "fit-content",
+              maxWidth: "100%",
               padding: "8px 12px",
               borderRadius: "999px",
               background: "rgba(59, 130, 246, 0.10)",
@@ -757,9 +1034,7 @@ function App() {
   };
 
   const renderTargetScanResults = () => {
-    if (targetScan.status !== "COMPLETED") {
-      return null;
-    }
+    if (targetScan.status !== "COMPLETED") return null;
 
     if (targetScanResults.loading) {
       return (
@@ -771,21 +1046,16 @@ function App() {
       );
     }
 
-    const result =
-      targetScanResults;
+    const result = targetScanResults;
 
     const criticalVulnerabilities =
       result.vulnerabilities.filter(
-        (item) =>
-          severityClass(item.severity) ===
-          "critical"
+        (item) => severityClass(item.severity) === "critical"
       ).length;
 
     const highVulnerabilities =
       result.vulnerabilities.filter(
-        (item) =>
-          severityClass(item.severity) ===
-          "high"
+        (item) => severityClass(item.severity) === "high"
       ).length;
 
     return (
@@ -800,13 +1070,9 @@ function App() {
         <section className="dashboard-card page-card">
           <div className="card-heading">
             <div>
-              <span className="card-label">
-                SCAN RESULT
-              </span>
-
+              <span className="card-label">SCAN RESULT</span>
               <h2>
-                Target:{" "}
-                {result.target || targetScan.target}
+                Target: {result.target || targetScan.target}
               </h2>
             </div>
 
@@ -832,51 +1098,37 @@ function App() {
           >
             <div className="metric">
               <span>Open Services</span>
-              <strong>
-                {result.services.length}
-              </strong>
+              <strong>{result.services.length}</strong>
             </div>
 
             <div className="metric">
               <span>Vulnerabilities</span>
-              <strong>
-                {result.vulnerabilities.length}
-              </strong>
+              <strong>{result.vulnerabilities.length}</strong>
             </div>
 
             <div className="metric">
               <span>Critical</span>
-              <strong>
-                {criticalVulnerabilities}
-              </strong>
+              <strong>{criticalVulnerabilities}</strong>
             </div>
 
             <div className="metric">
               <span>High</span>
-              <strong>
-                {highVulnerabilities}
-              </strong>
+              <strong>{highVulnerabilities}</strong>
             </div>
 
             <div className="metric">
               <span>Findings</span>
-              <strong>
-                {result.findings.length}
-              </strong>
+              <strong>{result.findings.length}</strong>
             </div>
 
             <div className="metric">
               <span>SOC Alerts</span>
-              <strong>
-                {result.alerts.length}
-              </strong>
+              <strong>{result.alerts.length}</strong>
             </div>
 
             <div className="metric">
               <span>Correlations</span>
-              <strong>
-                {result.correlations.length}
-              </strong>
+              <strong>{result.correlations.length}</strong>
             </div>
           </div>
         </section>
@@ -885,59 +1137,39 @@ function App() {
           <PageHeader
             label="TARGET"
             title="Asset Details"
-            count={
-              result.asset ? 1 : 0
-            }
+            count={result.asset ? 1 : 0}
           />
 
           {result.asset ? (
             <div className="detail-list">
               <Detail
                 label="IP Address"
-                value={
-                  result.asset.ip_address
-                }
+                value={result.asset.ip_address}
               />
-
               <Detail
                 label="Hostname"
-                value={
-                  result.asset.hostname
-                }
+                value={result.asset.hostname}
               />
-
               <Detail
                 label="Operating System"
-                value={
-                  result.asset.os_name
-                }
+                value={result.asset.os_name}
               />
-
               <Detail
                 label="MAC Address"
-                value={
-                  result.asset.mac_address
-                }
+                value={result.asset.mac_address}
               />
-
               <Detail
                 label="First Seen"
-                value={formatDate(
-                  result.asset.first_seen
-                )}
+                value={formatDate(result.asset.first_seen)}
               />
-
               <Detail
                 label="Last Seen"
-                value={formatDate(
-                  result.asset.last_seen
-                )}
+                value={formatDate(result.asset.last_seen)}
               />
             </div>
           ) : (
             <div className="empty-state">
-              Scan completed, but the matching
-              asset record was not returned.
+              Scan completed, but the matching asset record was not returned.
             </div>
           )}
         </section>
@@ -958,17 +1190,14 @@ function App() {
               "Version",
               "State",
             ]}
-            rows={result.services.map(
-              (service) => [
-                service.port,
-                service.protocol,
-                service.service_name ||
-                  "N/A",
-                service.product || "N/A",
-                service.version || "N/A",
-                service.state || "N/A",
-              ]
-            )}
+            rows={result.services.map((service) => [
+              service.port,
+              service.protocol,
+              service.service_name || "N/A",
+              service.product || "N/A",
+              service.version || "N/A",
+              service.state || "N/A",
+            ])}
           />
         </section>
 
@@ -976,28 +1205,18 @@ function App() {
           <PageHeader
             label="THREAT INTELLIGENCE"
             title="Target Vulnerabilities"
-            count={
-              result.vulnerabilities.length
-            }
+            count={result.vulnerabilities.length}
           />
 
           <DataTable
-            columns={[
-              "CVE",
-              "Title",
-              "Severity",
-              "CVSS",
-              "CWE",
-            ]}
-            rows={result.vulnerabilities.map(
-              (item) => [
-                item.cve_id || "N/A",
-                item.title || "N/A",
-                item.severity || "N/A",
-                item.cvss_score ?? "N/A",
-                item.cwe_id || "N/A",
-              ]
-            )}
+            columns={["CVE", "Title", "Severity", "CVSS", "CWE"]}
+            rows={result.vulnerabilities.map((item) => [
+              item.cve_id || "N/A",
+              item.title || "N/A",
+              item.severity || "N/A",
+              item.cvss_score ?? "N/A",
+              item.cwe_id || "N/A",
+            ])}
           />
         </section>
 
@@ -1017,18 +1236,14 @@ function App() {
               "Status",
               "Last Seen",
             ]}
-            rows={result.findings.map(
-              (item) => [
-                item.title || "N/A",
-                item.cve_id || "N/A",
-                item.severity || "N/A",
-                item.risk_score ?? "N/A",
-                item.status || "N/A",
-                formatDate(
-                  item.last_seen
-                ),
-              ]
-            )}
+            rows={result.findings.map((item) => [
+              item.title || "N/A",
+              item.cve_id || "N/A",
+              item.severity || "N/A",
+              item.risk_score ?? "N/A",
+              item.status || "N/A",
+              formatDate(item.last_seen),
+            ])}
           />
         </section>
 
@@ -1059,64 +1274,44 @@ function App() {
                 </thead>
 
                 <tbody>
-                  {result.alerts.map(
-                    (alert) => (
-                      <tr key={alert.id}>
-                        <td>
-                          <div className="finding-name">
-                            {alert.title ||
-                              "Security Alert"}
-                          </div>
+                  {result.alerts.map((alert) => (
+                    <tr key={alert.id}>
+                      <td>
+                        <div className="finding-name">
+                          {alert.title || "Security Alert"}
+                        </div>
+                        <div className="finding-sub">
+                          Alert #{alert.id}
+                        </div>
+                      </td>
 
-                          <div className="finding-sub">
-                            Alert #{alert.id}
-                          </div>
-                        </td>
+                      <td>{alert.alert_type || "N/A"}</td>
+                      <td>{alert.source_ip || "N/A"}</td>
+                      <td>{alert.destination_ip || "N/A"}</td>
 
-                        <td>
-                          {alert.alert_type ||
-                            "N/A"}
-                        </td>
+                      <td>
+                        <span
+                          className={`severity-badge ${severityClass(
+                            alert.severity
+                          )}`}
+                        >
+                          {alert.severity || "UNKNOWN"}
+                        </span>
+                      </td>
 
-                        <td>
-                          {alert.source_ip ||
-                            "N/A"}
-                        </td>
+                      <td>{alert.event_count ?? 0}</td>
 
-                        <td>
-                          {alert.destination_ip ||
-                            "N/A"}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`severity-badge ${severityClass(
-                              alert.severity
-                            )}`}
-                          >
-                            {alert.severity ||
-                              "UNKNOWN"}
-                          </span>
-                        </td>
-
-                        <td>
-                          {alert.event_count ??
-                            0}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`status-badge ${statusClass(
-                              alert.status
-                            )}`}
-                          >
-                            {alert.status ||
-                              "N/A"}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  )}
+                      <td>
+                        <span
+                          className={`status-badge ${statusClass(
+                            alert.status
+                          )}`}
+                        >
+                          {alert.status || "N/A"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1127,16 +1322,12 @@ function App() {
           <PageHeader
             label="CORRELATION ENGINE"
             title="Target Correlations"
-            count={
-              result.correlations.length
-            }
+            count={result.correlations.length}
           />
 
-          {result.correlations.length ===
-          0 ? (
+          {result.correlations.length === 0 ? (
             <div className="empty-state">
-              No vulnerability-to-alert correlations
-              mapped to this target.
+              No vulnerability-to-alert correlations mapped to this target.
             </div>
           ) : (
             <div className="table-container">
@@ -1153,72 +1344,55 @@ function App() {
                 </thead>
 
                 <tbody>
-                  {result.correlations.map(
-                    (correlation) => (
-                      <tr
-                        key={
-                          correlation.id
-                        }
-                      >
-                        <td>
-                          <div className="finding-name">
-                            {correlation.title ||
-                              "Security Correlation"}
-                          </div>
+                  {result.correlations.map((correlation) => (
+                    <tr key={correlation.id}>
+                      <td>
+                        <div className="finding-name">
+                          {correlation.title ||
+                            "Security Correlation"}
+                        </div>
+                        <div className="finding-sub">
+                          #{correlation.id}
+                        </div>
+                      </td>
 
-                          <div className="finding-sub">
-                            #
-                            {
-                              correlation.id
-                            }
-                          </div>
-                        </td>
+                      <td>
+                        {correlation.alert_type || "N/A"}
+                      </td>
 
-                        <td>
-                          {correlation.alert_type ||
-                            "N/A"}
-                        </td>
+                      <td>
+                        <span className="cve-code">
+                          {correlation.cve_id || "N/A"}
+                        </span>
+                      </td>
 
-                        <td>
-                          <span className="cve-code">
-                            {correlation.cve_id ||
-                              "N/A"}
-                          </span>
-                        </td>
+                      <td>
+                        <span
+                          className={`severity-badge ${severityClass(
+                            correlation.priority
+                          )}`}
+                        >
+                          {correlation.priority || "N/A"}
+                        </span>
+                      </td>
 
-                        <td>
-                          <span
-                            className={`severity-badge ${severityClass(
-                              correlation.priority
-                            )}`}
-                          >
-                            {correlation.priority ||
-                              "N/A"}
-                          </span>
-                        </td>
+                      <td>
+                        #{correlation.finding_id ?? "N/A"}
+                      </td>
 
-                        <td>
-                          #
-                          {correlation.finding_id ??
-                            "N/A"}
-                        </td>
-
-                        <td>
-                          <button
-                            type="button"
-                            className="action-button"
-                            onClick={() =>
-                              loadInvestigation(
-                                correlation.id
-                              )
-                            }
-                          >
-                            Investigate
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  )}
+                      <td>
+                        <button
+                          type="button"
+                          className="action-button"
+                          onClick={() =>
+                            loadInvestigation(correlation.id)
+                          }
+                        >
+                          Investigate
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1241,21 +1415,14 @@ function App() {
               "Completed",
               "Status",
             ]}
-            rows={result.scans.map(
-              (scan) => [
-                scan.id ?? "N/A",
-                scan.asset_id ?? "N/A",
-                scan.scanner_ip ||
-                  "N/A",
-                formatDate(
-                  scan.started_at
-                ),
-                formatDate(
-                  scan.completed_at
-                ),
-                scan.status || "N/A",
-              ]
-            )}
+            rows={result.scans.map((scan) => [
+              scan.id ?? "N/A",
+              scan.asset_id ?? "N/A",
+              scan.scanner_ip || "N/A",
+              formatDate(scan.started_at),
+              formatDate(scan.completed_at),
+              scan.status || "N/A",
+            ])}
           />
         </section>
       </>
@@ -1263,8 +1430,7 @@ function App() {
   };
 
   const renderTargetScan = () => {
-    const status =
-      targetScan.status || "IDLE";
+    const status = targetScan.status || "IDLE";
 
     const statusLabel = {
       IDLE: "Ready",
@@ -1279,16 +1445,13 @@ function App() {
         ? "completed"
         : status === "FAILED"
           ? "failed"
-          : status === "RUNNING" ||
-              status === "PENDING"
+          : status === "RUNNING" || status === "PENDING"
             ? "running"
             : "pending";
 
-    const scanRunning = [
-      "PENDING",
-      "RUNNING",
-    ].includes(status);
+    const scanRunning = ["PENDING", "RUNNING"].includes(status);
 
+    // Visual indicator only — not real Nmap progress
     const processingProgress = 42;
 
     return (
@@ -1296,40 +1459,36 @@ function App() {
         <section className="dashboard-card page-card">
           <div className="card-heading">
             <div>
-              <span className="card-label">
-                TARGET SCAN
-              </span>
-
+              <span className="card-label">TARGET SCAN</span>
               <h2>Target Scan</h2>
 
               <p
                 style={{
-                  margin: "8px 0 0",
+                  margin: "10px 0 0",
                   maxWidth: "720px",
                   fontSize: "14px",
-                  lineHeight: "1.6",
+                  lineHeight: "1.65",
                   opacity: 0.78,
                 }}
               >
-                Run an authorized Nmap scan against a lab target.
-                Once complete, VulnWatch imports the scan and
-                displays the target attack surface, vulnerabilities,
-                findings and SOC activity below.
+                Run an authorized Nmap scan against a lab target. Once
+                complete, VulnWatch imports the scan and displays the
+                target attack surface, vulnerabilities, findings and
+                SOC activity below.
               </p>
             </div>
 
-            <div
-              className={`status-badge ${statusClassName}`}
-            >
+            <div className={`status-badge ${statusClassName}`}>
               {statusLabel}
             </div>
           </div>
 
           <div
+            className="target-scan-layout"
             style={{
               display: "grid",
-              gap: "20px",
-              maxWidth: "900px",
+              gap: "22px",
+              maxWidth: "100%",
             }}
           >
             <div>
@@ -1339,15 +1498,17 @@ function App() {
                   display: "block",
                   marginBottom: "10px",
                   fontWeight: 600,
+                  fontSize: "14px",
                 }}
               >
                 Authorized target IP
               </label>
 
               <div
+                className="target-scan-input-row"
                 style={{
                   display: "flex",
-                  gap: "10px",
+                  gap: "12px",
                   flexWrap: "wrap",
                 }}
               >
@@ -1356,37 +1517,27 @@ function App() {
                   type="text"
                   value={targetScan.target}
                   onChange={(event) =>
-                    setTargetScan(
-                      (current) => ({
-                        ...current,
-                        target:
-                          event.target.value,
-                      })
-                    )
+                    setTargetScan((current) => ({
+                      ...current,
+                      target: event.target.value,
+                    }))
                   }
                   onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter"
-                    ) {
+                    if (event.key === "Enter") {
                       handleStartTargetScan();
                     }
                   }}
                   placeholder="e.g. 192.168.57.101"
                   aria-label="Authorized target IP"
-                  disabled={
-                    targetScanStarting ||
-                    scanRunning
-                  }
+                  disabled={targetScanStarting || scanRunning}
                   style={{
                     flex: "1 1 320px",
                     minWidth: "260px",
-                    padding:
-                      "12px 14px",
+                    padding: "13px 15px",
                     border:
                       "1px solid rgba(148, 163, 184, 0.35)",
                     borderRadius: "10px",
-                    background:
-                      "rgba(15, 23, 42, 0.65)",
+                    background: "rgba(15, 23, 42, 0.65)",
                     color: "inherit",
                     fontSize: "15px",
                   }}
@@ -1395,18 +1546,12 @@ function App() {
                 <button
                   type="button"
                   className="action-button"
-                  onClick={
-                    handleStartTargetScan
-                  }
-                  disabled={
-                    targetScanStarting ||
-                    scanRunning
-                  }
+                  onClick={handleStartTargetScan}
+                  disabled={targetScanStarting || scanRunning}
                   style={{
                     minWidth: "180px",
                     cursor:
-                      targetScanStarting ||
-                      scanRunning
+                      targetScanStarting || scanRunning
                         ? "not-allowed"
                         : "pointer",
                   }}
@@ -1420,16 +1565,19 @@ function App() {
               </div>
 
               <div
+                className="target-scan-network-badge"
                 style={{
-                  marginTop: "12px",
+                  marginTop: "13px",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
                   width: "fit-content",
+                  maxWidth: "100%",
                   padding: "8px 12px",
                   borderRadius: "999px",
                   background: "rgba(59, 130, 246, 0.10)",
-                  border: "1px solid rgba(59, 130, 246, 0.25)",
+                  border:
+                    "1px solid rgba(59, 130, 246, 0.25)",
                   fontSize: "12px",
                   fontWeight: 600,
                 }}
@@ -1441,18 +1589,14 @@ function App() {
 
             {targetScanError && (
               <div className="error-banner">
-                <strong>
-                  Target Scan Error
-                </strong>
-
-                <span>
-                  {targetScanError}
-                </span>
+                <strong>Target Scan Error</strong>
+                <span>{targetScanError}</span>
               </div>
             )}
 
             {targetScan.jobId && (
               <div
+                className="target-scan-job-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns:
@@ -1462,50 +1606,39 @@ function App() {
               >
                 <div className="metric">
                   <span>Job ID</span>
-                  <strong>
-                    #{targetScan.jobId}
-                  </strong>
+                  <strong>#{targetScan.jobId}</strong>
                 </div>
 
                 <div className="metric">
                   <span>Target</span>
                   <strong>
-                    {targetScan.target ||
-                      "N/A"}
+                    {targetScan.target || "N/A"}
                   </strong>
                 </div>
 
                 <div className="metric">
                   <span>Status</span>
-                  <strong>
-                    {statusLabel}
-                  </strong>
+                  <strong>{statusLabel}</strong>
                 </div>
 
                 <div className="metric">
                   <span>Created</span>
                   <strong>
-                    {formatDate(
-                      targetScan.createdAt
-                    )}
+                    {formatDate(targetScan.createdAt)}
                   </strong>
                 </div>
 
                 <div className="metric">
                   <span>Started</span>
                   <strong>
-                    {formatDate(
-                      targetScan.startedAt
-                    )}
+                    {formatDate(targetScan.startedAt)}
                   </strong>
                 </div>
 
                 <div className="metric">
                   <span>Completed</span>
                   <strong>
-                    {formatDate(
-                      targetScan.completedAt
-                    )}
+                    {formatDate(targetScan.completedAt)}
                   </strong>
                 </div>
               </div>
@@ -1513,11 +1646,11 @@ function App() {
 
             {scanRunning && (
               <div
+                className="target-scan-processing"
                 style={{
                   padding: "22px",
                   borderRadius: "14px",
-                  background:
-                    "rgba(59, 130, 246, 0.10)",
+                  background: "rgba(59, 130, 246, 0.10)",
                   border:
                     "1px solid rgba(59, 130, 246, 0.25)",
                 }}
@@ -1528,23 +1661,25 @@ function App() {
                     fontWeight: 800,
                     letterSpacing: "1.5px",
                     opacity: 0.72,
-                    marginBottom: "12px",
+                    marginBottom: "10px",
                   }}
                 >
                   PROCESSING
                 </div>
 
                 <div
+                  className="target-scan-processing-title"
                   style={{
                     fontSize: "22px",
                     fontWeight: 700,
-                    marginBottom: "18px",
+                    marginBottom: "16px",
                   }}
                 >
                   Processing your request
                 </div>
 
                 <div
+                  className="target-scan-progress-track"
                   style={{
                     width: "100%",
                     height: "8px",
@@ -1556,31 +1691,29 @@ function App() {
                   }}
                 >
                   <div
+                    className="target-scan-progress-fill"
                     style={{
                       width: `${processingProgress}%`,
                       height: "100%",
                       borderRadius: "999px",
                       background:
                         "linear-gradient(90deg, #38bdf8, #6366f1)",
-                      transition:
-                        "width 0.5s ease",
+                      transition: "width 0.5s ease",
                     }}
-                  ></div>
+                  />
                 </div>
 
                 <div
+                  className="target-scan-processing-footer"
                   style={{
                     display: "flex",
-                    justifyContent:
-                      "space-between",
+                    justifyContent: "space-between",
                     alignItems: "center",
                     fontSize: "13px",
                     opacity: 0.82,
                   }}
                 >
-                  <strong>
-                    {processingProgress} / 100
-                  </strong>
+                  <strong>Scan in progress</strong>
 
                   <span
                     style={{
@@ -1599,28 +1732,30 @@ function App() {
                         background: "#38bdf8",
                         display: "inline-block",
                       }}
-                    ></span>
+                    />
                   </span>
                 </div>
 
                 <div
+                  className="target-scan-processing-message"
                   style={{
                     marginTop: "12px",
                     fontSize: "13px",
                     opacity: 0.68,
                   }}
                 >
-                  Your authorized target scan is being
-                  processed. This page automatically
-                  checks the scan status every 3 seconds.
+                  Your authorized target scan is being processed.
+                  This page automatically checks the scan status every
+                  3 seconds.
                 </div>
               </div>
             )}
 
             {status === "COMPLETED" && (
               <div
+                className="target-scan-completed"
                 style={{
-                  padding: "16px",
+                  padding: "16px 18px",
                   borderRadius: "12px",
                   background:
                     "rgba(34, 197, 94, 0.10)",
@@ -1636,20 +1771,20 @@ function App() {
                   style={{
                     marginTop: "6px",
                     opacity: 0.8,
+                    lineHeight: "1.55",
                   }}
                 >
-                  Nmap XML was accepted by the
-                  backend and imported into
-                  PostgreSQL. Target results are
-                  shown below.
+                  Nmap XML was accepted by the backend and imported
+                  into PostgreSQL. Target results are shown below.
                 </div>
               </div>
             )}
 
             {status === "FAILED" && (
               <div
+                className="target-scan-failed"
                 style={{
-                  padding: "16px",
+                  padding: "16px 18px",
                   borderRadius: "12px",
                   background:
                     "rgba(239, 68, 68, 0.10)",
@@ -1657,14 +1792,13 @@ function App() {
                     "1px solid rgba(239, 68, 68, 0.25)",
                 }}
               >
-                <strong>
-                  Scan failed.
-                </strong>
+                <strong>Scan failed.</strong>
 
                 <div
                   style={{
                     marginTop: "6px",
                     opacity: 0.8,
+                    lineHeight: "1.55",
                   }}
                 >
                   {targetScan.errorMessage ||
@@ -1680,33 +1814,26 @@ function App() {
     );
   };
 
-  const loadInvestigation = async (
-    correlationId
-  ) => {
+  const loadInvestigation = async (correlationId) => {
     try {
       setInvestigationLoading(true);
       setInvestigationError("");
       setInvestigation(null);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/investigations/${correlationId}`
+      const response = await apiFetch(
+        `/api/v1/investigations/${correlationId}`
       );
 
       if (!response.ok) {
-        throw new Error(
-          "Investigation API request failed"
-        );
+        throw new Error("Investigation API request failed");
       }
 
       const data = await response.json();
 
       setInvestigation(data);
-      setActivePage(
-        "investigation-detail"
-      );
+      setActivePage("investigation-detail");
     } catch (err) {
       console.error(err);
-
       setInvestigationError(
         "Unable to load investigation details."
       );
@@ -1718,10 +1845,7 @@ function App() {
   const handleNavigation = (page) => {
     setActivePage(page);
 
-    if (
-      page !==
-      "investigation-detail"
-    ) {
+    if (page !== "investigation-detail") {
       setInvestigation(null);
       setInvestigationError("");
     }
@@ -1731,39 +1855,29 @@ function App() {
     <>
       <section className="hero-section">
         <div>
-          <div className="eyebrow">
-            SECURITY OVERVIEW
-          </div>
-
+          <div className="eyebrow">SECURITY OVERVIEW</div>
           <h1>Security Dashboard</h1>
-
           <p>
-            Monitor assets, vulnerabilities,
-            findings and security risk from one
-            centralized view.
+            Monitor assets, vulnerabilities, findings and security
+            risk from one centralized view.
           </p>
         </div>
 
         <div className="hero-decoration">
           <div className="scan-ring ring-one"></div>
           <div className="scan-ring ring-two"></div>
-          <div className="scan-core">
-            V
-          </div>
+          <div className="scan-core">V</div>
         </div>
       </section>
 
-      <div style={{ marginBottom: "24px" }}>
+      <div style={{ marginBottom: "26px" }}>
         {renderTargetScanLauncher()}
       </div>
 
       <section className="stats-grid">
         <div className="stat-card">
           <div className="stat-top">
-            <span className="stat-icon blue">
-              ◉
-            </span>
-
+            <span className="stat-icon blue">◉</span>
             <span className="stat-category">
               INFRASTRUCTURE
             </span>
@@ -1775,10 +1889,7 @@ function App() {
               : summary?.assets?.total ?? 0}
           </div>
 
-          <div className="stat-name">
-            Total Assets
-          </div>
-
+          <div className="stat-name">Total Assets</div>
           <div className="stat-line">
             Discovered infrastructure assets
           </div>
@@ -1786,10 +1897,7 @@ function App() {
 
         <div className="stat-card">
           <div className="stat-top">
-            <span className="stat-icon purple">
-              ⌘
-            </span>
-
+            <span className="stat-icon purple">⌘</span>
             <span className="stat-category">
               NETWORK
             </span>
@@ -1801,10 +1909,7 @@ function App() {
               : summary?.services?.total ?? 0}
           </div>
 
-          <div className="stat-name">
-            Services
-          </div>
-
+          <div className="stat-name">Services</div>
           <div className="stat-line">
             Network services discovered
           </div>
@@ -1812,10 +1917,7 @@ function App() {
 
         <div className="stat-card">
           <div className="stat-top">
-            <span className="stat-icon orange">
-              △
-            </span>
-
+            <span className="stat-icon orange">△</span>
             <span className="stat-category">
               THREATS
             </span>
@@ -1824,8 +1926,7 @@ function App() {
           <div className="stat-value">
             {loading
               ? "—"
-              : summary?.vulnerabilities
-                  ?.total ?? 0}
+              : summary?.vulnerabilities?.total ?? 0}
           </div>
 
           <div className="stat-name">
@@ -1839,10 +1940,7 @@ function App() {
 
         <div className="stat-card critical-card">
           <div className="stat-top">
-            <span className="stat-icon red">
-              !
-            </span>
-
+            <span className="stat-icon red">!</span>
             <span className="stat-category">
               FINDINGS
             </span>
@@ -1872,7 +1970,6 @@ function App() {
                 <span className="card-label">
                   RISK ANALYSIS
                 </span>
-
                 <h2>Risk Overview</h2>
               </div>
             </div>
@@ -1881,58 +1978,38 @@ function App() {
               <div className="risk-circle">
                 <div className="risk-circle-inner">
                   <strong>
-                    {riskOverview?.risk
-                      ?.open ?? 0}
+                    {riskOverview?.risk?.open ?? 0}
                   </strong>
-
-                  <span>
-                    OPEN RISK
-                  </span>
+                  <span>OPEN RISK</span>
                 </div>
               </div>
 
               <div className="risk-metrics">
                 <div className="metric">
-                  <span>
-                    Open Findings
-                  </span>
-
+                  <span>Open Findings</span>
                   <strong>
-                    {riskOverview?.findings
-                      ?.open ?? 0}
+                    {riskOverview?.findings?.open ?? 0}
                   </strong>
                 </div>
 
                 <div className="metric">
-                  <span>
-                    Total Findings
-                  </span>
-
+                  <span>Total Findings</span>
                   <strong>
-                    {riskOverview?.findings
-                      ?.total ?? 0}
+                    {riskOverview?.findings?.total ?? 0}
                   </strong>
                 </div>
 
                 <div className="metric">
-                  <span>
-                    Average Risk
-                  </span>
-
+                  <span>Average Risk</span>
                   <strong>
-                    {riskOverview?.risk
-                      ?.average_open ?? 0}
+                    {riskOverview?.risk?.average_open ?? 0}
                   </strong>
                 </div>
 
                 <div className="metric">
-                  <span>
-                    Highest Risk
-                  </span>
-
+                  <span>Highest Risk</span>
                   <strong>
-                    {riskOverview?.risk
-                      ?.highest_open ?? 0}
+                    {riskOverview?.risk?.highest_open ?? 0}
                   </strong>
                 </div>
               </div>
@@ -1945,59 +2022,46 @@ function App() {
                 <span className="card-label">
                   THREAT LEVEL
                 </span>
-
-                <h2>
-                  Severity Distribution
-                </h2>
+                <h2>Severity Distribution</h2>
               </div>
             </div>
 
             <div className="distribution">
-              {severityDistribution.map(
-                (item) => (
-                  <div
-                    className="distribution-item"
-                    key={item.severity}
-                  >
-                    <div className="distribution-title">
-                      <span
-                        className={`severity-dot ${severityClass(
-                          item.severity
-                        )}`}
-                      ></span>
+              {severityDistribution.map((item) => (
+                <div
+                  className="distribution-item"
+                  key={item.severity}
+                >
+                  <div className="distribution-title">
+                    <span
+                      className={`severity-dot ${severityClass(
+                        item.severity
+                      )}`}
+                    ></span>
 
-                      <span>
-                        {item.severity}
-                      </span>
-
-                      <strong>
-                        {item.count}
-                      </strong>
-                    </div>
-
-                    <div className="progress-track">
-                      <div
-                        className={`progress-fill ${severityClass(
-                          item.severity
-                        )}`}
-                        style={{
-                          width: `${
-                            (item.count /
-                              Math.max(
-                                summary
-                                  ?.findings
-                                  ?.total ||
-                                  1,
-                                1
-                              )) *
-                            100
-                          }%`,
-                        }}
-                      ></div>
-                    </div>
+                    <span>{item.severity}</span>
+                    <strong>{item.count}</strong>
                   </div>
-                )
-              )}
+
+                  <div className="progress-track">
+                    <div
+                      className={`progress-fill ${severityClass(
+                        item.severity
+                      )}`}
+                      style={{
+                        width: `${
+                          (item.count /
+                            Math.max(
+                              summary?.findings?.total || 1,
+                              1
+                            )) *
+                          100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -2007,41 +2071,34 @@ function App() {
                 <span className="card-label">
                   WORKFLOW
                 </span>
-
-                <h2>
-                  Finding Status
-                </h2>
+                <h2>Finding Status</h2>
               </div>
             </div>
 
             <div className="status-list">
-              {statusDistribution.map(
-                (item) => (
-                  <div
-                    className="status-row"
-                    key={item.status}
-                  >
-                    <div>
-                      <span
-                        className={`status-dot ${statusClass(
-                          item.status
-                        )}`}
-                      ></span>
+              {statusDistribution.map((item) => (
+                <div
+                  className="status-row"
+                  key={item.status}
+                >
+                  <div>
+                    <span
+                      className={`status-dot ${statusClass(
+                        item.status
+                      )}`}
+                    ></span>
 
-                      <span>
-                        {item.status?.replaceAll(
-                          "_",
-                          " "
-                        )}
-                      </span>
-                    </div>
-
-                    <strong>
-                      {item.count}
-                    </strong>
+                    <span>
+                      {item.status?.replaceAll(
+                        "_",
+                        " "
+                      )}
+                    </span>
                   </div>
-                )
-              )}
+
+                  <strong>{item.count}</strong>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -2054,10 +2111,7 @@ function App() {
               <span className="card-label">
                 SECURITY EVENTS
               </span>
-
-              <h2>
-                Recent Findings
-              </h2>
+              <h2>Recent Findings</h2>
             </div>
 
             <div className="finding-total">
@@ -2080,71 +2134,64 @@ function App() {
               </thead>
 
               <tbody>
-                {recentFindings.map(
-                  (finding) => (
-                    <tr
-                      key={finding.id}
-                    >
-                      <td>
-                        <div className="finding-name">
-                          {finding.title}
-                        </div>
+                {recentFindings.map((finding) => (
+                  <tr key={finding.id}>
+                    <td>
+                      <div className="finding-name">
+                        {finding.title}
+                      </div>
 
-                        <div className="finding-sub">
-                          {finding.hostname ||
-                            "N/A"}
-                        </div>
-                      </td>
+                      <div className="finding-sub">
+                        {finding.hostname || "N/A"}
+                      </div>
+                    </td>
 
-                      <td>
-                        <span className="cve-code">
-                          {finding.cve_id ||
-                            "N/A"}
-                        </span>
-                      </td>
+                    <td>
+                      <span className="cve-code">
+                        {finding.cve_id || "N/A"}
+                      </span>
+                    </td>
 
-                      <td>
-                        {finding.target_ip ||
-                          "N/A"}
-                      </td>
+                    <td>
+                      {finding.target_ip || "N/A"}
+                    </td>
 
-                      <td>
-                        {finding.port
-                          ? `${finding.port}/${finding.protocol || ""}`
-                          : "N/A"}
-                      </td>
+                    <td>
+                      {finding.port
+                        ? `${finding.port}/${finding.protocol || ""}`
+                        : "N/A"}
+                    </td>
 
-                      <td>
-                        <span
-                          className={`severity-badge ${severityClass(
-                            finding.severity
-                          )}`}
-                        >
-                          {finding.severity}
-                        </span>
-                      </td>
+                    <td>
+                      <span
+                        className={`severity-badge ${severityClass(
+                          finding.severity
+                        )}`}
+                      >
+                        {finding.severity}
+                      </span>
+                    </td>
 
-                      <td>
-                        <strong className="risk-number-small">
-                          {finding.risk_score}
-                        </strong>
-                      </td>
+                    <td>
+                      <strong className="risk-number-small">
+                        {finding.risk_score}
+                      </strong>
+                    </td>
 
-                      <td>
-                        <span
-                          className={`status-badge ${statusClass(
-                            finding.status
-                          )}`}
-                        >
-                          {finding.status?.replaceAll(
-                            "_",
-                            " "
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                )}
+                    <td>
+                      <span
+                        className={`status-badge ${statusClass(
+                          finding.status
+                        )}`}
+                      >
+                        {finding.status?.replaceAll(
+                          "_",
+                          " "
+                        )}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -2204,8 +2251,7 @@ function App() {
           service.target_ip,
           service.port,
           service.protocol,
-          service.service_name ||
-            "N/A",
+          service.service_name || "N/A",
           service.product || "N/A",
           service.version || "N/A",
           service.state || "N/A",
@@ -2219,9 +2265,7 @@ function App() {
       <PageHeader
         label="VULNERABILITY MANAGEMENT"
         title="Vulnerabilities"
-        count={
-          vulnerabilities.length
-        }
+        count={vulnerabilities.length}
       />
 
       <DataTable
@@ -2232,15 +2276,13 @@ function App() {
           "CVSS",
           "CWE",
         ]}
-        rows={vulnerabilities.map(
-          (item) => [
-            item.cve_id || "N/A",
-            item.title || "N/A",
-            item.severity || "N/A",
-            item.cvss_score ?? "N/A",
-            item.cwe_id || "N/A",
-          ]
-        )}
+        rows={vulnerabilities.map((item) => [
+          item.cve_id || "N/A",
+          item.title || "N/A",
+          item.severity || "N/A",
+          item.cvss_score ?? "N/A",
+          item.cwe_id || "N/A",
+        ])}
       />
     </section>
   );
@@ -2295,12 +2337,8 @@ function App() {
           scan.asset_id,
           scan.scanner_ip || "N/A",
           scan.scan_type || "N/A",
-          formatDate(
-            scan.started_at
-          ),
-          formatDate(
-            scan.completed_at
-          ),
+          formatDate(scan.started_at),
+          formatDate(scan.completed_at),
           scan.status || "N/A",
         ])}
       />
@@ -2334,8 +2372,7 @@ function App() {
               <tr key={alert.id}>
                 <td>
                   <div className="finding-name">
-                    {alert.title ||
-                      "Security Alert"}
+                    {alert.title || "Security Alert"}
                   </div>
 
                   <div className="finding-sub">
@@ -2343,19 +2380,9 @@ function App() {
                   </div>
                 </td>
 
-                <td>
-                  {alert.alert_type}
-                </td>
-
-                <td>
-                  {alert.source_ip ||
-                    "N/A"}
-                </td>
-
-                <td>
-                  {alert.destination_ip ||
-                    "N/A"}
-                </td>
+                <td>{alert.alert_type}</td>
+                <td>{alert.source_ip || "N/A"}</td>
+                <td>{alert.destination_ip || "N/A"}</td>
 
                 <td>
                   <span
@@ -2367,10 +2394,7 @@ function App() {
                   </span>
                 </td>
 
-                <td>
-                  {alert.event_count ??
-                    0}
-                </td>
+                <td>{alert.event_count ?? 0}</td>
 
                 <td>
                   <span
@@ -2394,9 +2418,7 @@ function App() {
       <PageHeader
         label="CORRELATION ENGINE"
         title="Correlations"
-        count={
-          correlations.length
-        }
+        count={correlations.length}
       />
 
       <div className="table-container">
@@ -2414,75 +2436,59 @@ function App() {
           </thead>
 
           <tbody>
-            {correlations.map(
-              (correlation) => (
-                <tr
-                  key={
-                    correlation.id
-                  }
-                >
-                  <td>
-                    <div className="finding-name">
-                      {correlation.title}
-                    </div>
+            {correlations.map((correlation) => (
+              <tr key={correlation.id}>
+                <td>
+                  <div className="finding-name">
+                    {correlation.title}
+                  </div>
 
-                    <div className="finding-sub">
-                      Correlation #
-                      {
-                        correlation.id
-                      }
-                    </div>
-                  </td>
+                  <div className="finding-sub">
+                    Correlation #{correlation.id}
+                  </div>
+                </td>
 
-                  <td>
-                    {correlation.target_ip ||
-                      "N/A"}
-                  </td>
+                <td>
+                  {correlation.target_ip || "N/A"}
+                </td>
 
-                  <td>
-                    {correlation.alert_type ||
-                      "N/A"}
-                  </td>
+                <td>
+                  {correlation.alert_type || "N/A"}
+                </td>
 
-                  <td>
-                    <span className="cve-code">
-                      {correlation.cve_id ||
-                        "N/A"}
-                    </span>
-                  </td>
+                <td>
+                  <span className="cve-code">
+                    {correlation.cve_id || "N/A"}
+                  </span>
+                </td>
 
-                  <td>
-                    <span
-                      className={`severity-badge ${severityClass(
-                        correlation.priority
-                      )}`}
-                    >
-                      {correlation.priority}
-                    </span>
-                  </td>
+                <td>
+                  <span
+                    className={`severity-badge ${severityClass(
+                      correlation.priority
+                    )}`}
+                  >
+                    {correlation.priority}
+                  </span>
+                </td>
 
-                  <td>
-                    #
-                    {correlation.finding_id ??
-                      "N/A"}
-                  </td>
+                <td>
+                  #{correlation.finding_id ?? "N/A"}
+                </td>
 
-                  <td>
-                    <button
-                      type="button"
-                      className="action-button"
-                      onClick={() =>
-                        loadInvestigation(
-                          correlation.id
-                        )
-                      }
-                    >
-                      Investigate
-                    </button>
-                  </td>
-                </tr>
-              )
-            )}
+                <td>
+                  <button
+                    type="button"
+                    className="action-button"
+                    onClick={() =>
+                      loadInvestigation(correlation.id)
+                    }
+                  >
+                    Investigate
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -2494,568 +2500,419 @@ function App() {
       <PageHeader
         label="SOC INVESTIGATION"
         title="Investigations"
-        count={
-          correlations.length
-        }
+        count={correlations.length}
       />
 
       <div className="investigation-list">
-        {correlations.map(
-          (correlation) => (
-            <div
-              className="investigation-card"
-              key={
-                correlation.id
-              }
-            >
-              <div className="investigation-card-main">
-                <div>
-                  <span className="card-label">
-                    CORRELATION #
-                    {correlation.id}
-                  </span>
-
-                  <h3>
-                    {correlation.title}
-                  </h3>
-
-                  <p>
-                    {correlation.target_ip ||
-                      "Unknown asset"}{" "}
-                    ·{" "}
-                    {correlation.alert_type ||
-                      "Security alert"}{" "}
-                    ·{" "}
-                    {correlation.cve_id ||
-                      "No CVE"}
-                  </p>
-                </div>
-
-                <span
-                  className={`severity-badge ${severityClass(
-                    correlation.priority
-                  )}`}
-                >
-                  {correlation.priority}
+        {correlations.map((correlation) => (
+          <div
+            className="investigation-card"
+            key={correlation.id}
+          >
+            <div className="investigation-card-main">
+              <div>
+                <span className="card-label">
+                  CORRELATION #{correlation.id}
                 </span>
+
+                <h3>{correlation.title}</h3>
+
+                <p>
+                  {correlation.target_ip ||
+                    "Unknown asset"}{" "}
+                  ·{" "}
+                  {correlation.alert_type ||
+                    "Security alert"}{" "}
+                  ·{" "}
+                  {correlation.cve_id || "No CVE"}
+                </p>
               </div>
 
-              <button
-                type="button"
-                className="action-button"
-                onClick={() =>
-                  loadInvestigation(
-                    correlation.id
-                  )
-                }
+              <span
+                className={`severity-badge ${severityClass(
+                  correlation.priority
+                )}`}
               >
-                Open Investigation
-              </button>
+                {correlation.priority}
+              </span>
             </div>
-          )
-        )}
+
+            <button
+              type="button"
+              className="action-button"
+              onClick={() =>
+                loadInvestigation(correlation.id)
+              }
+            >
+              Open Investigation
+            </button>
+          </div>
+        ))}
       </div>
     </section>
   );
 
-  const renderInvestigationDetail =
-    () => {
-      if (investigationLoading) {
-        return (
-          <section className="dashboard-card page-card">
-            <div className="empty-state">
-              Loading investigation...
-            </div>
-          </section>
-        );
-      }
-
-      if (investigationError) {
-        return (
-          <section className="dashboard-card page-card">
-            <div className="error-banner">
-              <strong>
-                Investigation Error
-              </strong>
-
-              <span>
-                {investigationError}
-              </span>
-            </div>
-          </section>
-        );
-      }
-
-      if (!investigation) {
-        return (
-          <section className="dashboard-card page-card">
-            <div className="empty-state">
-              Select a correlation to
-              start an investigation.
-            </div>
-          </section>
-        );
-      }
-
-      const {
-        correlation,
-        asset,
-        alert,
-        vulnerability,
-        finding,
-        services:
-          investigationServices,
-        events,
-        evidence,
-      } = investigation;
-
+  const renderInvestigationDetail = () => {
+    if (investigationLoading) {
       return (
-        <>
-          <div className="investigation-back">
-            <button
-              type="button"
-              className="action-button secondary"
-              onClick={() =>
-                handleNavigation(
-                  "investigations"
-                )
-              }
-            >
-              ← Back to Investigations
-            </button>
+        <section className="dashboard-card page-card">
+          <div className="empty-state">
+            Loading investigation...
+          </div>
+        </section>
+      );
+    }
+
+    if (investigationError) {
+      return (
+        <section className="dashboard-card page-card">
+          <div className="error-banner">
+            <strong>Investigation Error</strong>
+            <span>{investigationError}</span>
+          </div>
+        </section>
+      );
+    }
+
+    if (!investigation) {
+      return (
+        <section className="dashboard-card page-card">
+          <div className="empty-state">
+            Select a correlation to start an investigation.
+          </div>
+        </section>
+      );
+    }
+
+    const {
+      correlation,
+      asset,
+      alert,
+      vulnerability,
+      finding,
+      services: investigationServices,
+      events,
+      evidence,
+    } = investigation;
+
+    return (
+      <>
+        <div className="investigation-back">
+          <button
+            type="button"
+            className="action-button secondary"
+            onClick={() =>
+              handleNavigation("investigations")
+            }
+          >
+            ← Back to Investigations
+          </button>
+        </div>
+
+        <section className="investigation-hero">
+          <div>
+            <span className="eyebrow">
+              INVESTIGATION #{correlation.id}
+            </span>
+
+            <h1>{correlation.title}</h1>
+            <p>{correlation.description}</p>
           </div>
 
-          <section className="investigation-hero">
+          <span
+            className={`severity-badge large ${severityClass(
+              correlation.priority
+            )}`}
+          >
+            {correlation.priority}
+          </span>
+        </section>
+
+        <section className="investigation-grid">
+          <div className="dashboard-card investigation-panel">
+            <div className="card-heading">
+              <div>
+                <span className="card-label">
+                  AFFECTED ASSET
+                </span>
+                <h2>Asset Details</h2>
+              </div>
+            </div>
+
+            <div className="detail-list">
+              <Detail
+                label="IP Address"
+                value={asset?.ip_address}
+              />
+              <Detail
+                label="Hostname"
+                value={asset?.hostname}
+              />
+              <Detail
+                label="OS"
+                value={asset?.os_name}
+              />
+              <Detail
+                label="MAC"
+                value={asset?.mac_address}
+              />
+            </div>
+          </div>
+
+          <div className="dashboard-card investigation-panel">
+            <div className="card-heading">
+              <div>
+                <span className="card-label">
+                  SOC ALERT
+                </span>
+                <h2>Alert Details</h2>
+              </div>
+            </div>
+
+            <div className="detail-list">
+              <Detail
+                label="Type"
+                value={alert?.alert_type}
+              />
+              <Detail
+                label="Source IP"
+                value={alert?.source_ip}
+              />
+              <Detail
+                label="Destination IP"
+                value={alert?.destination_ip}
+              />
+              <Detail
+                label="Event Count"
+                value={alert?.event_count}
+              />
+              <Detail
+                label="Status"
+                value={alert?.status}
+              />
+            </div>
+          </div>
+
+          <div className="dashboard-card investigation-panel">
+            <div className="card-heading">
+              <div>
+                <span className="card-label">
+                  VULNERABILITY
+                </span>
+                <h2>Vulnerability Details</h2>
+              </div>
+            </div>
+
+            <div className="detail-list">
+              <Detail
+                label="CVE"
+                value={vulnerability?.cve_id}
+              />
+              <Detail
+                label="Title"
+                value={vulnerability?.title}
+              />
+              <Detail
+                label="CVSS"
+                value={vulnerability?.cvss_score}
+              />
+              <Detail
+                label="Severity"
+                value={vulnerability?.severity}
+              />
+              <Detail
+                label="CWE"
+                value={vulnerability?.cwe_id}
+              />
+            </div>
+          </div>
+
+          <div className="dashboard-card investigation-panel">
+            <div className="card-heading">
+              <div>
+                <span className="card-label">
+                  RISK FINDING
+                </span>
+                <h2>Finding Details</h2>
+              </div>
+            </div>
+
+            <div className="detail-list">
+              <Detail
+                label="Finding ID"
+                value={finding?.id}
+              />
+              <Detail
+                label="Risk Score"
+                value={finding?.risk_score}
+              />
+              <Detail
+                label="Severity"
+                value={finding?.severity}
+              />
+              <Detail
+                label="Status"
+                value={finding?.status}
+              />
+              <Detail
+                label="Resolved At"
+                value={formatDate(finding?.resolved_at)}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-card page-card">
+          <div className="card-heading">
             <div>
-              <span className="eyebrow">
-                INVESTIGATION #
-                {correlation.id}
+              <span className="card-label">
+                ATTACK SURFACE
               </span>
-
-              <h1>
-                {correlation.title}
-              </h1>
-
-              <p>
-                {correlation.description}
-              </p>
+              <h2>Related Services</h2>
             </div>
 
-            <span
-              className={`severity-badge large ${severityClass(
-                correlation.priority
-              )}`}
-            >
-              {correlation.priority}
-            </span>
-          </section>
+            <div className="finding-total">
+              {investigationServices?.length || 0} services
+            </div>
+          </div>
 
-          <section className="investigation-grid">
-            <div className="dashboard-card investigation-panel">
-              <div className="card-heading">
-                <div>
-                  <span className="card-label">
-                    AFFECTED ASSET
-                  </span>
+          <DataTable
+            columns={[
+              "Port",
+              "Protocol",
+              "Service",
+              "Product",
+              "Version",
+              "State",
+            ]}
+            rows={(investigationServices || []).map(
+              (service) => [
+                service.port,
+                service.protocol,
+                service.service_name || "N/A",
+                service.product || "N/A",
+                service.version || "N/A",
+                service.state || "N/A",
+              ]
+            )}
+          />
+        </section>
 
-                  <h2>
-                    Asset Details
-                  </h2>
-                </div>
-              </div>
-
-              <div className="detail-list">
-                <Detail
-                  label="IP Address"
-                  value={
-                    asset?.ip_address
-                  }
-                />
-
-                <Detail
-                  label="Hostname"
-                  value={
-                    asset?.hostname
-                  }
-                />
-
-                <Detail
-                  label="OS"
-                  value={
-                    asset?.os_name
-                  }
-                />
-
-                <Detail
-                  label="MAC"
-                  value={
-                    asset?.mac_address
-                  }
-                />
-              </div>
+        <section className="dashboard-card page-card">
+          <div className="card-heading">
+            <div>
+              <span className="card-label">
+                SOC TIMELINE
+              </span>
+              <h2>Security Events</h2>
             </div>
 
-            <div className="dashboard-card investigation-panel">
-              <div className="card-heading">
-                <div>
-                  <span className="card-label">
-                    SOC ALERT
-                  </span>
-
-                  <h2>
-                    Alert Details
-                  </h2>
-                </div>
-              </div>
-
-              <div className="detail-list">
-                <Detail
-                  label="Type"
-                  value={
-                    alert?.alert_type
-                  }
-                />
-
-                <Detail
-                  label="Source IP"
-                  value={
-                    alert?.source_ip
-                  }
-                />
-
-                <Detail
-                  label="Destination IP"
-                  value={
-                    alert?.destination_ip
-                  }
-                />
-
-                <Detail
-                  label="Event Count"
-                  value={
-                    alert?.event_count
-                  }
-                />
-
-                <Detail
-                  label="Status"
-                  value={
-                    alert?.status
-                  }
-                />
-              </div>
+            <div className="finding-total">
+              {events?.length || 0} events
             </div>
+          </div>
 
-            <div className="dashboard-card investigation-panel">
-              <div className="card-heading">
-                <div>
-                  <span className="card-label">
-                    VULNERABILITY
-                  </span>
+          <div className="timeline">
+            {(events || []).map((event) => (
+              <div
+                className="timeline-item"
+                key={event.id}
+              >
+                <div className="timeline-marker"></div>
 
-                  <h2>
-                    Vulnerability Details
-                  </h2>
-                </div>
-              </div>
+                <div className="timeline-content">
+                  <div className="timeline-top">
+                    <strong>{event.event_type}</strong>
 
-              <div className="detail-list">
-                <Detail
-                  label="CVE"
-                  value={
-                    vulnerability?.cve_id
-                  }
-                />
-
-                <Detail
-                  label="Title"
-                  value={
-                    vulnerability?.title
-                  }
-                />
-
-                <Detail
-                  label="CVSS"
-                  value={
-                    vulnerability?.cvss_score
-                  }
-                />
-
-                <Detail
-                  label="Severity"
-                  value={
-                    vulnerability?.severity
-                  }
-                />
-
-                <Detail
-                  label="CWE"
-                  value={
-                    vulnerability?.cwe_id
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="dashboard-card investigation-panel">
-              <div className="card-heading">
-                <div>
-                  <span className="card-label">
-                    RISK FINDING
-                  </span>
-
-                  <h2>
-                    Finding Details
-                  </h2>
-                </div>
-              </div>
-
-              <div className="detail-list">
-                <Detail
-                  label="Finding ID"
-                  value={
-                    finding?.id
-                  }
-                />
-
-                <Detail
-                  label="Risk Score"
-                  value={
-                    finding?.risk_score
-                  }
-                />
-
-                <Detail
-                  label="Severity"
-                  value={
-                    finding?.severity
-                  }
-                />
-
-                <Detail
-                  label="Status"
-                  value={
-                    finding?.status
-                  }
-                />
-
-                <Detail
-                  label="Resolved At"
-                  value={formatDate(
-                    finding?.resolved_at
-                  )}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="dashboard-card page-card">
-            <div className="card-heading">
-              <div>
-                <span className="card-label">
-                  ATTACK SURFACE
-                </span>
-
-                <h2>
-                  Related Services
-                </h2>
-              </div>
-
-              <div className="finding-total">
-                {investigationServices
-                  ?.length || 0}{" "}
-                services
-              </div>
-            </div>
-
-            <DataTable
-              columns={[
-                "Port",
-                "Protocol",
-                "Service",
-                "Product",
-                "Version",
-                "State",
-              ]}
-              rows={(
-                investigationServices ||
-                []
-              ).map(
-                (service) => [
-                  service.port,
-                  service.protocol,
-                  service.service_name ||
-                    "N/A",
-                  service.product ||
-                    "N/A",
-                  service.version ||
-                    "N/A",
-                  service.state ||
-                    "N/A",
-                ]
-              )}
-            />
-          </section>
-
-          <section className="dashboard-card page-card">
-            <div className="card-heading">
-              <div>
-                <span className="card-label">
-                  SOC TIMELINE
-                </span>
-
-                <h2>
-                  Security Events
-                </h2>
-              </div>
-
-              <div className="finding-total">
-                {events?.length ||
-                  0}{" "}
-                events
-              </div>
-            </div>
-
-            <div className="timeline">
-              {(events || []).map(
-                (event) => (
-                  <div
-                    className="timeline-item"
-                    key={event.id}
-                  >
-                    <div className="timeline-marker"></div>
-
-                    <div className="timeline-content">
-                      <div className="timeline-top">
-                        <strong>
-                          {
-                            event.event_type
-                          }
-                        </strong>
-
-                        <span
-                          className={`severity-badge ${severityClass(
-                            event.severity
-                          )}`}
-                        >
-                          {event.severity}
-                        </span>
-                      </div>
-
-                      <div className="timeline-meta">
-                        {formatDate(
-                          event.event_time
-                        )}
-                        {" · "}
-                        {event.source_ip ||
-                          "N/A"}
-                        {" → "}
-                        {event.destination_ip ||
-                          "N/A"}
-                      </div>
-
-                      {event.raw_log && (
-                        <pre className="evidence-code">
-                          {event.raw_log}
-                        </pre>
-                      )}
-                    </div>
+                    <span
+                      className={`severity-badge ${severityClass(
+                        event.severity
+                      )}`}
+                    >
+                      {event.severity}
+                    </span>
                   </div>
-                )
-              )}
-            </div>
-          </section>
 
-          <section className="dashboard-card page-card">
-            <div className="card-heading">
-              <div>
-                <span className="card-label">
-                  EVIDENCE
-                </span>
+                  <div className="timeline-meta">
+                    {formatDate(event.event_time)} ·{" "}
+                    {event.source_ip || "N/A"} →{" "}
+                    {event.destination_ip || "N/A"}
+                  </div>
 
-                <h2>
-                  Investigation Evidence
-                </h2>
-              </div>
-
-              <div className="finding-total">
-                {evidence?.length ||
-                  0}{" "}
-                records
-              </div>
-            </div>
-
-            <div className="evidence-list">
-              {(evidence || []).map(
-                (item) => (
-                  <div
-                    className="evidence-item"
-                    key={`${item.event_id}-${item.event_time}`}
-                  >
-                    <div>
-                      <strong>
-                        {
-                          item.event_type
-                        }
-                      </strong>
-
-                      <span>
-                        {item.source ||
-                          "Unknown source"}{" "}
-                        ·{" "}
-                        {formatDate(
-                          item.event_time
-                        )}
-                      </span>
-                    </div>
-
+                  {event.raw_log && (
                     <pre className="evidence-code">
-                      {item.raw_log}
+                      {event.raw_log}
                     </pre>
-                  </div>
-                )
-              )}
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="dashboard-card page-card">
+          <div className="card-heading">
+            <div>
+              <span className="card-label">
+                EVIDENCE
+              </span>
+              <h2>Investigation Evidence</h2>
             </div>
-          </section>
-        </>
-      );
-    };
+
+            <div className="finding-total">
+              {evidence?.length || 0} records
+            </div>
+          </div>
+
+          <div className="evidence-list">
+            {(evidence || []).map((item) => (
+              <div
+                className="evidence-item"
+                key={`${item.event_id}-${item.event_time}`}
+              >
+                <div>
+                  <strong>{item.event_type}</strong>
+                  <span>
+                    {item.source || "Unknown source"} ·{" "}
+                    {formatDate(item.event_time)}
+                  </span>
+                </div>
+
+                <pre className="evidence-code">
+                  {item.raw_log}
+                </pre>
+              </div>
+            ))}
+          </div>
+        </section>
+      </>
+    );
+  };
 
   const renderPage = () => {
     switch (activePage) {
       case "dashboard":
         return renderDashboard();
-
       case "assets":
         return renderAssets();
-
       case "services":
         return renderServices();
-
       case "vulnerabilities":
         return renderVulnerabilities();
-
       case "findings":
         return renderFindings();
-
       case "scans":
         return renderScans();
-
       case "target-scan":
         return renderTargetScan();
-
       case "alerts":
         return renderAlerts();
-
       case "correlations":
         return renderCorrelations();
-
       case "investigations":
         return renderInvestigations();
-
       case "investigation-detail":
         return renderInvestigationDetail();
-
       default:
         return renderDashboard();
     }
@@ -3065,263 +2922,205 @@ function App() {
     dashboard: "Dashboard",
     assets: "Assets",
     services: "Services",
-    vulnerabilities:
-      "Vulnerabilities",
+    vulnerabilities: "Vulnerabilities",
     findings: "Findings",
     scans: "Scans",
-    "target-scan":
-      "Target Scan",
+    "target-scan": "Target Scan",
     alerts: "Alerts",
-    correlations:
-      "Correlations",
-    investigations:
-      "Investigations",
-    "investigation-detail":
-      "Investigation Detail",
+    correlations: "Correlations",
+    investigations: "Investigations",
+    "investigation-detail": "Investigation Detail",
   };
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-icon">
-            V
+    <>
+      <style>{UI_STYLES}</style>
+
+      <div className="app-shell">
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <div className="brand-icon">V</div>
+
+            <div>
+              <div className="brand-name">
+                VulnWatch
+              </div>
+
+              <div className="brand-version">
+                Security Platform
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div className="brand-name">
-              VulnWatch
+          <nav className="sidebar-nav">
+            <div className="nav-section">
+              MONITORING
             </div>
 
-            <div className="brand-version">
-              Security Platform
-            </div>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="nav-section">
-            MONITORING
-          </div>
-
-          <NavButton
-            active={
-              activePage ===
-              "dashboard"
-            }
-            icon="▦"
-            label="Dashboard"
-            onClick={() =>
-              handleNavigation(
-                "dashboard"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage === "assets"
-            }
-            icon="◉"
-            label="Assets"
-            onClick={() =>
-              handleNavigation(
-                "assets"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage ===
-              "services"
-            }
-            icon="⌘"
-            label="Services"
-            onClick={() =>
-              handleNavigation(
-                "services"
-              )
-            }
-          />
-
-          <div className="nav-section">
-            SECURITY
-          </div>
-
-          <NavButton
-            active={
-              activePage ===
-              "vulnerabilities"
-            }
-            icon="△"
-            label="Vulnerabilities"
-            onClick={() =>
-              handleNavigation(
-                "vulnerabilities"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage ===
-              "findings"
-            }
-            icon="!"
-            label="Findings"
-            onClick={() =>
-              handleNavigation(
-                "findings"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage === "scans"
-            }
-            icon="◫"
-            label="Scans"
-            onClick={() =>
-              handleNavigation(
-                "scans"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage ===
-              "target-scan"
-            }
-            icon="⌁"
-            label="Target Scan"
-            onClick={() =>
-              handleNavigation(
-                "target-scan"
-              )
-            }
-          />
-
-          <div className="nav-section">
-            SOC
-          </div>
-
-          <NavButton
-            active={
-              activePage === "alerts"
-            }
-            icon="⚠"
-            label="Alerts"
-            onClick={() =>
-              handleNavigation(
-                "alerts"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage ===
-              "correlations"
-            }
-            icon="↔"
-            label="Correlations"
-            onClick={() =>
-              handleNavigation(
-                "correlations"
-              )
-            }
-          />
-
-          <NavButton
-            active={
-              activePage ===
-                "investigations" ||
-              activePage ===
-                "investigation-detail"
-            }
-            icon="⌕"
-            label="Investigations"
-            onClick={() =>
-              handleNavigation(
-                "investigations"
-              )
-            }
-          />
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="system-status">
-            <span className="online-dot"></span>
-            System Operational
-          </div>
-
-          <div className="sidebar-footer-text">
-            VulnWatch v0.1.0
-          </div>
-        </div>
-      </aside>
-
-      <div className="main-area">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <span>Security</span>
-            <b>/</b>
-            {pageTitle[activePage]}
-          </div>
-
-          <div className="topbar-right">
-            <div className="last-scan">
-              Security monitoring active
-            </div>
-
-            <button
-              type="button"
-              className={`refresh-button ${
-                refreshing
-                  ? "refreshing"
-                  : ""
-              }`}
-              onClick={
-                handleRefresh
+            <NavButton
+              active={activePage === "dashboard"}
+              icon="▦"
+              label="Dashboard"
+              onClick={() =>
+                handleNavigation("dashboard")
               }
-              disabled={refreshing}
-            >
-              {refreshing
-                ? "Refreshing..."
-                : "Refresh Data"}
-            </button>
+            />
 
-            <div className="backend-status">
-              <span className="online-dot"></span>
-              Backend Connected
+            <NavButton
+              active={activePage === "assets"}
+              icon="◉"
+              label="Assets"
+              onClick={() =>
+                handleNavigation("assets")
+              }
+            />
+
+            <NavButton
+              active={activePage === "services"}
+              icon="⌘"
+              label="Services"
+              onClick={() =>
+                handleNavigation("services")
+              }
+            />
+
+            <div className="nav-section">
+              SECURITY
             </div>
 
-            <div className="user-avatar">
-              V
+            <NavButton
+              active={
+                activePage === "vulnerabilities"
+              }
+              icon="△"
+              label="Vulnerabilities"
+              onClick={() =>
+                handleNavigation("vulnerabilities")
+              }
+            />
+
+            <NavButton
+              active={activePage === "findings"}
+              icon="!"
+              label="Findings"
+              onClick={() =>
+                handleNavigation("findings")
+              }
+            />
+
+            <NavButton
+              active={activePage === "scans"}
+              icon="◫"
+              label="Scans"
+              onClick={() =>
+                handleNavigation("scans")
+              }
+            />
+
+            <NavButton
+              active={activePage === "target-scan"}
+              icon="⌁"
+              label="Target Scan"
+              onClick={() =>
+                handleNavigation("target-scan")
+              }
+            />
+
+            <div className="nav-section">
+              SOC
+            </div>
+
+            <NavButton
+              active={activePage === "alerts"}
+              icon="⚠"
+              label="Alerts"
+              onClick={() =>
+                handleNavigation("alerts")
+              }
+            />
+
+            <NavButton
+              active={activePage === "correlations"}
+              icon="↔"
+              label="Correlations"
+              onClick={() =>
+                handleNavigation("correlations")
+              }
+            />
+
+            <NavButton
+              active={
+                activePage === "investigations" ||
+                activePage === "investigation-detail"
+              }
+              icon="⌕"
+              label="Investigations"
+              onClick={() =>
+                handleNavigation("investigations")
+              }
+            />
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="system-status">
+              <span className="online-dot"></span>
+              System Operational
+            </div>
+
+            <div className="sidebar-footer-text">
+              VulnWatch v0.1.0
             </div>
           </div>
-        </header>
+        </aside>
 
-        <main className="dashboard-content">
-          {error && (
-            <div className="error-banner">
-              <strong>
-                Connection Error
-              </strong>
-
-              <span>
-                {error}
-              </span>
+        <div className="main-area">
+          <header className="topbar">
+            <div className="breadcrumb">
+              <span>Security</span>
+              <b>/</b>
+              {pageTitle[activePage]}
             </div>
-          )}
 
-          {renderPage()}
-        </main>
+            <div className="topbar-right">
+              <div className="last-scan">
+                Security monitoring active
+              </div>
+
+              <button
+                type="button"
+                className={`refresh-button ${
+                  refreshing ? "refreshing" : ""
+                }`}
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                {refreshing
+                  ? "Refreshing..."
+                  : "Refresh Data"}
+              </button>
+
+              <div className="backend-status">
+                <span className="online-dot"></span>
+                Backend Connected
+              </div>
+
+              <div className="user-avatar">V</div>
+            </div>
+          </header>
+
+          <main className="dashboard-content">
+            {error && (
+              <div className="error-banner">
+                <strong>Connection Error</strong>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {renderPage()}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -3334,32 +3133,20 @@ function NavButton({
   return (
     <button
       type="button"
-      className={`nav-item ${
-        active ? "active" : ""
-      }`}
+      className={`nav-item ${active ? "active" : ""}`}
       onClick={onClick}
     >
-      <span className="nav-icon">
-        {icon}
-      </span>
-
+      <span className="nav-icon">{icon}</span>
       {label}
     </button>
   );
 }
 
-function PageHeader({
-  label,
-  title,
-  count,
-}) {
+function PageHeader({ label, title, count }) {
   return (
     <div className="card-heading">
       <div>
-        <span className="card-label">
-          {label}
-        </span>
-
+        <span className="card-label">{label}</span>
         <h2>{title}</h2>
       </div>
 
@@ -3370,22 +3157,15 @@ function PageHeader({
   );
 }
 
-function DataTable({
-  columns,
-  rows,
-}) {
+function DataTable({ columns, rows }) {
   return (
     <div className="table-container">
       <table>
         <thead>
           <tr>
-            {columns.map(
-              (column) => (
-                <th key={column}>
-                  {column}
-                </th>
-              )
-            )}
+            {columns.map((column) => (
+              <th key={column}>{column}</th>
+            ))}
           </tr>
         </thead>
 
@@ -3393,43 +3173,22 @@ function DataTable({
           {rows.length === 0 ? (
             <tr>
               <td
-                colSpan={
-                  columns.length
-                }
+                colSpan={columns.length}
                 className="empty-table"
               >
                 No records available.
               </td>
             </tr>
           ) : (
-            rows.map(
-              (
-                row,
-                rowIndex
-              ) => (
-                <tr
-                  key={
-                    rowIndex
-                  }
-                >
-                  {row.map(
-                    (
-                      value,
-                      columnIndex
-                    ) => (
-                      <td
-                        key={
-                          columnIndex
-                        }
-                      >
-                        {value ??
-                          "N/A"}
-                      </td>
-                    )
-                  )}
-                </tr>
-              )
-            )
+            rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((value, columnIndex) => (
+                  <td key={columnIndex}>
+                    {value ?? "N/A"}
+                  </td>
+                ))}
+              </tr>
+            ))
           )}
         </tbody>
       </table>
@@ -3437,17 +3196,11 @@ function DataTable({
   );
 }
 
-function Detail({
-  label,
-  value,
-}) {
+function Detail({ label, value }) {
   return (
     <div className="detail-row">
       <span>{label}</span>
-
-      <strong>
-        {value ?? "N/A"}
-      </strong>
+      <strong>{value ?? "N/A"}</strong>
     </div>
   );
 }

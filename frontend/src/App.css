@@ -1,4 +1,3 @@
-```css
 * {
   box-sizing: border-box;
 }
@@ -44,7 +43,9 @@ button {
     #070b14;
 }
 
-/* SIDEBAR */
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
 
 .sidebar {
   position: fixed;
@@ -208,7 +209,9 @@ button {
   font-size: 10px;
 }
 
-/* MAIN */
+/* =========================================================
+   MAIN
+   ========================================================= */
 
 .main-area {
   width: calc(100% - 245px);
@@ -277,7 +280,9 @@ button {
   font-weight: 800;
 }
 
-/* CONTENT */
+/* =========================================================
+   CONTENT
+   ========================================================= */
 
 .dashboard-content {
   width: 100%;
@@ -286,7 +291,9 @@ button {
   padding: 34px;
 }
 
-/* HERO */
+/* =========================================================
+   HERO
+   ========================================================= */
 
 .hero-section {
   position: relative;
@@ -380,85 +387,195 @@ button {
   box-shadow: 0 0 35px rgba(70, 105, 210, 0.25);
 }
 
-/* TARGET SCAN */
+/* =========================================================
+   TARGET SCAN
+   ========================================================= */
+
+.target-scan-shell {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 24px 32px;
+  box-sizing: border-box;
+}
 
 .target-scan-card {
   width: 100%;
   min-width: 0;
-  margin-bottom: 22px;
+  margin: 0 0 24px;
+  box-sizing: border-box;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: var(--card-bg, #111827);
 }
 
-.target-scan-heading {
-  min-width: 0;
-}
-
-.target-scan-heading h2 {
-  margin: 5px 0 0;
-  color: #e7ebf3;
-  font-size: 18px;
-}
-
-.target-scan-description {
-  padding: 0 20px 16px;
-  color: #9aa8bc;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.target-scan-form {
+.target-scan-card-inner {
   width: 100%;
-  padding: 0 20px 20px;
+  box-sizing: border-box;
+  padding: 30px;
+}
+
+/* HEADER */
+
+.target-scan-card-header {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 30px;
+  box-sizing: border-box;
+}
+
+.target-scan-card-header > div {
+  min-width: 0;
+  flex: 1;
 }
 
 .target-scan-label {
   display: block;
-  margin-bottom: 10px;
+  margin: 0 0 10px;
   color: #7e8da5;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.4;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.target-scan-input-row {
-  width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px;
-  gap: 12px;
-  align-items: stretch;
+.target-scan-card-header h2 {
+  margin: 0 0 10px;
+  color: #e7ebf3;
+  font-size: 26px;
+  line-height: 1.25;
+  font-weight: 700;
 }
 
-.target-scan-input {
+.target-scan-card-header p {
+  margin: 0;
+  max-width: 680px;
+  color: #9aa8bc;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.68;
+}
+
+/* STATUS BADGE */
+
+.target-scan-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.target-scan-status.ready {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.target-scan-status.processing {
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.target-scan-status.completed {
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.target-scan-status.failed {
+  background: rgba(239, 68, 68, 0.14);
+}
+
+/* =========================================================
+   TARGET CONFIGURATION / FORM
+   ========================================================= */
+
+.target-scan-form {
   width: 100%;
-  min-width: 0;
-  height: 48px;
-  padding: 0 15px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.target-scan-form::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin-top: 24px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.09) 10%,
+    rgba(255, 255, 255, 0.09) 90%,
+    transparent 100%
+  );
+}
+
+.target-scan-form label {
+  display: block;
+  margin: 0 0 10px;
+  color: #9ba8bb;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.target-scan-form input {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 14px;
   border: 1px solid #30415f;
-  border-radius: 9px;
+  border-radius: 10px;
   outline: none;
   background: #0b1424;
   color: #e5ebf5;
-  font-size: 13px;
+  font: inherit;
 }
 
-.target-scan-input:focus {
-  border-color: #5379cf;
+.target-scan-form input::placeholder {
+  color: #53617a;
+}
+
+.target-scan-form input:focus {
+  border-color: rgba(83, 121, 207, 0.8);
   box-shadow: 0 0 0 3px rgba(83, 121, 207, 0.1);
 }
 
 .target-scan-button {
-  width: 100%;
-  min-width: 0;
-  height: 48px;
-  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
   border: 1px solid #2d4775;
-  border-radius: 9px;
+  border-radius: 10px;
   background: #111f37;
   color: #9db7f5;
-  font-size: 11px;
-  font-weight: 800;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  white-space: nowrap;
+  box-sizing: border-box;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease,
+    opacity 0.2s ease;
 }
 
 .target-scan-button:hover:not(:disabled) {
@@ -466,9 +583,13 @@ button {
   border-color: #4a6fae;
 }
 
+.target-scan-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .target-scan-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .target-scan-help {
@@ -477,11 +598,250 @@ button {
   font-size: 10px;
 }
 
-/* PROCESSING */
+/* =========================================================
+   PROCESSING CARD
+   ========================================================= */
+
+.target-scan-processing {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 24px 0 24px;
+  padding: 24px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(18, 31, 54, 0.96),
+      rgba(10, 18, 32, 0.96)
+    );
+}
+
+/*
+  Clear visual separation between configuration
+  and processing state.
+*/
+.target-scan-processing::before {
+  content: "";
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: -13px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(91, 130, 255, 0.28) 12%,
+    rgba(91, 130, 255, 0.28) 88%,
+    transparent 100%
+  );
+}
+
+.target-scan-processing-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 22px;
+}
+
+.target-scan-processing-top > div {
+  min-width: 0;
+}
+
+.target-scan-processing-label {
+  display: block;
+  margin: 0 0 8px;
+  color: #6e91ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+.target-scan-processing h3 {
+  margin: 0 0 8px;
+  color: #f0f4fb;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.target-scan-processing p {
+  margin: 0;
+  max-width: 720px;
+  color: #9aa8bc;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.68;
+}
+
+.target-scan-processing-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+
+/* =========================================================
+   PROGRESS
+   ========================================================= */
+
+.target-scan-progress {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #1a2941;
+  isolation: isolate;
+}
+
+.target-scan-progress-fill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #4f78ff 0%,
+    #6387ff 55%,
+    #7c63e8 100%
+  );
+  box-shadow: 0 0 14px rgba(79, 120, 255, 0.35);
+  transform-origin: left center;
+  transition: width 0.3s ease;
+}
+
+.target-scan-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #687892;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+/* =========================================================
+   SUCCESS / ERROR
+   ========================================================= */
+
+.target-scan-message {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 0 24px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.target-scan-message strong {
+  color: #dce4f1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.target-scan-message span {
+  color: #9aa8bc;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.72;
+}
+
+.target-scan-message.success {
+  background: rgba(34, 197, 94, 0.06);
+}
+
+.target-scan-message.error {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.target-scan-footer {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: #687892;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.58;
+}
+
+.target-scan-footer span {
+  min-width: 0;
+}
+
+/* =========================================================
+   RESULTS
+   ========================================================= */
+
+.target-scan-results-card {
+  margin-top: 0;
+}
+
+.target-scan-results-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.target-scan-result-item {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.target-scan-result-item span {
+  display: block;
+  margin: 0 0 8px;
+  color: #718096;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.6;
+}
+
+.target-scan-result-item strong {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #dce4f1;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+/* =========================================================
+   PROCESSING - LEGACY SUPPORT
+   ========================================================= */
 
 .processing-panel {
   width: 100%;
-  margin: 18px 20px 20px;
+  box-sizing: border-box;
+  margin: 24px 0;
   padding: 22px;
   border: 1px solid #263957;
   border-radius: 12px;
@@ -518,7 +878,9 @@ button {
 
 .processing-bar-fill {
   height: 100%;
-  border-radius: inherit;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 999px;
   background: linear-gradient(90deg, #4f78ff, #7394ff);
   box-shadow: 0 0 14px rgba(79, 120, 255, 0.35);
   transition: width 0.5s ease;
@@ -564,7 +926,9 @@ button {
   }
 }
 
-/* STATS */
+/* =========================================================
+   STATS
+   ========================================================= */
 
 .stats-grid {
   display: grid;
@@ -666,7 +1030,9 @@ button {
   border-color: #3a242a;
 }
 
-/* ANALYTICS */
+/* =========================================================
+   ANALYTICS
+   ========================================================= */
 
 .analytics-grid {
   display: grid;
@@ -778,7 +1144,9 @@ button {
   font-size: 18px;
 }
 
-/* DISTRIBUTION */
+/* =========================================================
+   DISTRIBUTION
+   ========================================================= */
 
 .distribution {
   padding: 14px 20px 20px;
@@ -896,7 +1264,9 @@ button {
   background: #22c55e;
 }
 
-/* TABLES */
+/* =========================================================
+   TABLES
+   ========================================================= */
 
 .findings-card,
 .page-card {
@@ -1035,7 +1405,9 @@ tbody tr:hover {
   text-align: center;
 }
 
-/* BUTTONS */
+/* =========================================================
+   BUTTONS
+   ========================================================= */
 
 .refresh-button,
 .action-button {
@@ -1085,7 +1457,9 @@ tbody tr:hover {
   background: transparent;
 }
 
-/* ERROR */
+/* =========================================================
+   ERROR
+   ========================================================= */
 
 .error-banner {
   margin-bottom: 18px;
@@ -1104,7 +1478,9 @@ tbody tr:hover {
   color: #b7777d;
 }
 
-/* SOC INVESTIGATION */
+/* =========================================================
+   SOC INVESTIGATION
+   ========================================================= */
 
 .investigation-list {
   padding: 18px;
@@ -1324,7 +1700,9 @@ tbody tr:hover {
   font-size: 12px;
 }
 
-/* RESPONSIVE */
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
 
 @media (max-width: 1200px) {
   .stats-grid {
@@ -1351,6 +1729,19 @@ tbody tr:hover {
 
   .target-scan-button {
     width: 100%;
+  }
+
+  .target-scan-shell {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .target-scan-card-inner {
+    padding: 24px;
+  }
+
+  .target-scan-results-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1442,6 +1833,53 @@ tbody tr:hover {
     margin-left: 0;
     margin-right: 0;
   }
+
+  .target-scan-processing {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .target-scan-shell {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .target-scan-card-inner {
+    padding: 20px;
+  }
+
+  .target-scan-card-header {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .target-scan-status {
+    align-self: flex-start;
+  }
+
+  .target-scan-form {
+    padding: 18px;
+  }
+
+  .target-scan-processing {
+    padding: 18px;
+  }
+
+  .target-scan-processing::before {
+    left: 18px;
+    right: 18px;
+  }
+
+  .target-scan-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .target-scan-results-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1509,16 +1947,6 @@ tbody tr:hover {
     text-align: left;
   }
 
-  .target-scan-description {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .target-scan-form {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
   .processing-panel {
     padding: 18px;
   }
@@ -1528,423 +1956,13 @@ tbody tr:hover {
     flex-direction: column;
     gap: 8px;
   }
-}
 
-/* =========================================================
-   PHASE 14 - TARGET SCAN LAYOUT FIX
-   ========================================================= */
-
-.target-scan-shell {
-  width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 8px 24px 32px;
-  box-sizing: border-box;
-}
-
-.target-scan-card {
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0 0 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  overflow: hidden;
-  background: var(--card-bg, #111827);
-}
-
-.target-scan-card-inner {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 30px;
-}
-
-
-/* ---------------------------------------------------------
-   HEADER
-   --------------------------------------------------------- */
-
-.target-scan-card-header {
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin: 0 0 30px;
-  box-sizing: border-box;
-}
-
-.target-scan-card-header > div {
-  min-width: 0;
-  flex: 1;
-}
-
-.target-scan-label {
-  display: block;
-  margin: 0 0 10px;
-  font-size: 11px;
-  line-height: 1.4;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.target-scan-card-header h2 {
-  margin: 0 0 10px;
-  font-size: 26px;
-  line-height: 1.25;
-  font-weight: 700;
-}
-
-.target-scan-card-header p {
-  margin: 0;
-  max-width: 680px;
-  font-size: 14px;
-  line-height: 1.6;
-  opacity: 0.68;
-}
-
-
-/* ---------------------------------------------------------
-   STATUS BADGE
-   --------------------------------------------------------- */
-
-.target-scan-status {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 700;
-  white-space: nowrap;
-  box-sizing: border-box;
-}
-
-.target-scan-status.ready {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.target-scan-status.processing {
-  background: rgba(59, 130, 246, 0.14);
-}
-
-.target-scan-status.completed {
-  background: rgba(34, 197, 94, 0.14);
-}
-
-.target-scan-status.failed {
-  background: rgba(239, 68, 68, 0.14);
-}
-
-
-/* ---------------------------------------------------------
-   FORM
-   --------------------------------------------------------- */
-
-.target-scan-form {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 24px;
-  margin: 0 0 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.target-scan-form label {
-  display: block;
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.4;
-  font-weight: 600;
-}
-
-.target-scan-form input {
-  display: block;
-  width: 100%;
-  min-height: 46px;
-  box-sizing: border-box;
-  margin: 0 0 16px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  outline: none;
-  font: inherit;
-}
-
-.target-scan-form input:focus {
-  border-color: rgba(59, 130, 246, 0.7);
-}
-
-.target-scan-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 10px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.target-scan-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-
-/* ---------------------------------------------------------
-   PROCESSING CARD
-   --------------------------------------------------------- */
-
-.target-scan-processing {
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0 0 24px;
-  padding: 24px;
-  border: 1px solid rgba(59, 130, 246, 0.18);
-  border-radius: 14px;
-  background: rgba(59, 130, 246, 0.045);
-}
-
-.target-scan-processing-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  margin: 0 0 22px;
-}
-
-.target-scan-processing-top > div {
-  min-width: 0;
-}
-
-.target-scan-processing-label {
-  display: block;
-  margin: 0 0 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  opacity: 0.65;
-}
-
-.target-scan-processing h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  line-height: 1.35;
-}
-
-.target-scan-processing p {
-  margin: 0;
-  max-width: 720px;
-  font-size: 13px;
-  line-height: 1.6;
-  opacity: 0.68;
-}
-
-.target-scan-processing-dot {
-  flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-
-/* ---------------------------------------------------------
-   PROGRESS
-   --------------------------------------------------------- */
-
-.target-scan-progress {
-  width: 100%;
-  height: 8px;
-  margin: 0 0 10px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.target-scan-progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: currentColor;
-  transition: width 0.3s ease;
-}
-
-.target-scan-progress-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  font-size: 12px;
-  line-height: 1.4;
-  opacity: 0.68;
-}
-
-
-/* ---------------------------------------------------------
-   SUCCESS / ERROR
-   --------------------------------------------------------- */
-
-.target-scan-message {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin: 0 0 24px;
-  padding: 18px 20px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.target-scan-message strong {
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.target-scan-message span {
-  font-size: 13px;
-  line-height: 1.6;
-  opacity: 0.72;
-}
-
-.target-scan-message.success {
-  background: rgba(34, 197, 94, 0.06);
-}
-
-.target-scan-message.error {
-  background: rgba(239, 68, 68, 0.06);
-}
-
-
-/* ---------------------------------------------------------
-   FOOTER
-   --------------------------------------------------------- */
-
-.target-scan-footer {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  font-size: 11px;
-  line-height: 1.5;
-  opacity: 0.58;
-}
-
-.target-scan-footer span {
-  min-width: 0;
-}
-
-
-/* ---------------------------------------------------------
-   RESULTS
-   --------------------------------------------------------- */
-
-.target-scan-results-card {
-  margin-top: 0;
-}
-
-.target-scan-results-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.target-scan-result-item {
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.target-scan-result-item span {
-  display: block;
-  margin: 0 0 8px;
-  font-size: 11px;
-  line-height: 1.4;
-  opacity: 0.6;
-}
-
-.target-scan-result-item strong {
-  display: block;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: 17px;
-  line-height: 1.4;
-}
-
-
-/* ---------------------------------------------------------
-   RESPONSIVE
-   --------------------------------------------------------- */
-
-@media (max-width: 900px) {
-  .target-scan-shell {
-    padding-left: 18px;
-    padding-right: 18px;
+  .target-scan-processing-top {
+    gap: 12px;
   }
 
-  .target-scan-card-inner {
-    padding: 24px;
-  }
-
-  .target-scan-results-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-
-@media (max-width: 640px) {
-  .target-scan-shell {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  .target-scan-card-inner {
-    padding: 20px;
-  }
-
-  .target-scan-card-header {
-    flex-direction: column;
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-
-  .target-scan-status {
-    align-self: flex-start;
-  }
-
-  .target-scan-form {
-    padding: 18px;
-  }
-
-  .target-scan-processing {
-    padding: 18px;
-  }
-
-  .target-scan-footer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .target-scan-results-grid {
-    grid-template-columns: 1fr;
+  .target-scan-progress-meta {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }
